@@ -8,6 +8,7 @@ Created on Thu Jun 28 15:30:07 2018
 from os import path
 from sys import argv
 import numpy as np
+import copy
 
 class EventEntry():
     """Class describing the attributes of the parameters for a given event 
@@ -31,10 +32,14 @@ class EventEntry():
         self.sig_piEE = None
         self.piEN = None
         self.sig_piEN = None
-        self.fs = None
-        self.sig_fs = None
-        self.fb = None
-        self.sig_fb = None
+        self.fs1 = None
+        self.sig_fs1 = None
+        self.fb1 = None
+        self.sig_fb1 = None
+        self.fs2 = None
+        self.sig_fs2 = None
+        self.fb2 = None
+        self.sig_fb2 = None
         self.s = None
         self.sig_s = None
         self.q = None
@@ -46,7 +51,8 @@ class EventEntry():
         self.dadt = None
         self.sig_dadt = None
         self.t0_par = None
-        self.chisq  = None
+        self.chisq1  = None
+        self.chisq2  = None
         self.M1 = None
         self.sig_M1 = None
         self.M2 = None
@@ -75,10 +81,14 @@ class EventEntry():
                     ('sig_piEE', 'float', [-5.0,5.0], None),
                     ('piEN', 'float', [-5.0,5.0], None),
                     ('sig_piEN', 'float', [-5.0,5.0], None),
-                    ('fs', 'float', [-500.0,500000.0], 'required'),
-                    ('sig_fs', 'float', [0.0,50000.0], 'required'),
-                    ('fb', 'float', [-500.0,50000.0], 'required'),
-                    ('sig_fb', 'float', [0.0,50000.0], 'required'),
+                    ('fs1', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs1', 'float', [0.0,50000.0], 'required'),
+                    ('fb1', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb1', 'float', [0.0,50000.0], 'required'),
+                    ('fs2', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs2', 'float', [0.0,50000.0], 'required'),
+                    ('fb2', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb2', 'float', [0.0,50000.0], 'required'),
                     ('s', 'float', [0.0,50.0], 'required'),
                     ('sig_s', 'float', [0.0,50.0], 'required'),
                     ('q', 'float', [0.0,1.0], 'required'),
@@ -90,7 +100,8 @@ class EventEntry():
                     ('dadt', 'float', [0.0,6.4], None), 
                     ('sig_dadt', 'float', [0.0,6.4], None),
                     ('t0_par', 'float', [2450000.0,2470000.0], None), 
-                    ('chisq', 'float', [0.0,1000000.0], 'required'), 
+                    ('chisq1', 'float', [0.0,1000000.0], 'required'), 
+                    ('chisq2', 'float', [0.0,1000000.0], 'required'), 
                     ('M1', 'float', [0.0,20.0], None),
                     ('sig_M1', 'float', [0.0,20.0], None),
                     ('M2', 'float', [0.0,20.0], None),
@@ -208,33 +219,38 @@ def read_standard_ascii_DC_table(file_path):
     # Column 12: Uncertainty on πE,E<br>
     # Column 13: Parallax parameter πE,N<br>
     # Column 14: Uncertainty on πE,N<br>
-    # Column 15: Source flux, fs [counts/s] - priority<br>
-    # Column 16: Uncertainty in fs [counts/s] - priority<br>
-    # Column 17: Blend flux, fb [counts/s] - priority<br>
-    # Column 18: Uncertainty in fb [counts/s] - priority<br>
-    # Column 19: Binary separation, s, [normalised by θE] - priority<br>
-    # Column 20: Uncertainty on s - priority<br>
-    # Column 21: Mass ratio, q = M2/M1 - priority<br>
-    # Column 22: Uncertainty on q - priority<br>
-    # Column 23: Angle of lens motion, alpha - priority<br>
-    # Column 24: Uncertainty on alpha - priority<br>
-    # Column 25: Rate of change of s, ds/dt<br>
-    # Column 26: Uncertainty on ds/dt<br>
-    # Column 27: Rate of change of alpha, dalpha/dt<br>
-    # Column 28: Uncertainty on dalpha/dt<br>
-    # Column 29: t0_par [days]<br>
-    # Column 30: Chi squared of the fitted model<br>
-    # Column 31: Primary lens mass, M1 [Msolar]<br>
-    # Column 32: Uncertainty on M1 [Msolar]<br>
-    # Column 33: Secondary lens mass, M2 [MJupiter]<br>
-    # Column 34: Uncertainty on M2 [MJupiter]<br>
-    # Column 35: Distance to the lens, DL [kpc]<br>
-    # Column 36: Uncertainty on DL [kpc]<br>
-    # Column 37: Distance to the source, DS [kpc]<br>
-    # Column 38: Uncertainty on DS [kpc]<br>
-    # Column 39: Projected separation of lens masses, aperp [AU]<br>
-    # Column 40: Uncertainty on aperp [AU]<br>
-    # Column 41: Time taken to fit the lightcurve from data ingest to final output [hrs]<br>
+    # Column 15: Source flux, fs, filter 1 [counts/s] - priority<br>
+    # Column 16: Uncertainty in fs, filter 1 [counts/s] - priority<br>
+    # Column 17: Blend flux, fb, filter 1 [counts/s] - priority<br>
+    # Column 18: Uncertainty in fb, filter 1 [counts/s] - priority<br>
+    # Column 19: Source flux, fs, filter 2 [counts/s] - priority<br>
+    # Column 20: Uncertainty in fs, filter 2 [counts/s] - priority<br>
+    # Column 21: Blend flux, fb, filter 2 [counts/s] - priority<br>
+    # Column 22: Uncertainty in fb, filter 2 [counts/s] - priority<br>
+    # Column 23: Binary separation, s, [normalised by θE] - priority<br>
+    # Column 24: Uncertainty on s - priority<br>
+    # Column 25: Mass ratio, q = M2/M1 - priority<br>
+    # Column 26: Uncertainty on q - priority<br>
+    # Column 27: Angle of lens motion, alpha - priority<br>
+    # Column 28: Uncertainty on alpha - priority<br>
+    # Column 29: Rate of change of s, ds/dt<br>
+    # Column 30: Uncertainty on ds/dt<br>
+    # Column 31: Rate of change of alpha, dalpha/dt<br>
+    # Column 32: Uncertainty on dalpha/dt<br>
+    # Column 33: t0_par [days]<br>
+    # Column 34: Chi squared of the fitted model, filter 1<br>
+    # Column 34: Chi squared of the fitted model, filter 2<br>
+    # Column 35: Primary lens mass, M1 [Msolar]<br>
+    # Column 36: Uncertainty on M1 [Msolar]<br>
+    # Column 37: Secondary lens mass, M2 [MJupiter]<br>
+    # Column 38: Uncertainty on M2 [MJupiter]<br>
+    # Column 39: Distance to the lens, DL [kpc]<br>
+    # Column 40: Uncertainty on DL [kpc]<br>
+    # Column 41: Distance to the source, DS [kpc]<br>
+    # Column 42: Uncertainty on DS [kpc]<br>
+    # Column 43: Projected separation of lens masses, aperp [AU]<br>
+    # Column 44: Uncertainty on aperp [AU]<br>
+    # Column 45: Time taken to fit the lightcurve from data ingest to final output [hrs]<br>
     """
     
     if path.isfile(file_path) == False:
@@ -309,85 +325,95 @@ def read_master_table(file_path):
     master_data = []
     
     for i,l in enumerate(lines):
-        print(l)
-        entries = l.replace('\n','').split()
         
-        e = EventEntry()
-        
-        if 'dcnormffp' in l: # PSPL, inc FFP
-            pars = { 'model_class': 'PSPL',
-                     'idx': 95,
-                    }
-                    
-        elif 'ombin' in l or 'omcassan' in l: # Binary star
-            pars = { 'model_class': 'Binary_star',
-                     'idx': 81,
-                     }
-        
-        elif 'omcassan' in l:   # Bound planet
-             pars = { 'model_class': 'Binary_planet',
-                     'idx': 81,
-                     }
-        
-        if 'dccv' in l: # CV
-             pars = { 'model_class': 'CV',
-                     'idx': 79,
-                     }
-        
-        e.t0 = float(entries[32])
-        e.sig_t0 = 0.0
-        e.tE = float(entries[33])
-        e.sig_tE = 0.0
-        e.u0 = float(entries[30])
-        e.sig_u0 = 0.0
-        e.rho = float(entries[37])
-        e.sig_rho = 0.0
-        e.piEE = float(entries[36])     # piE -> piEN, piEE
-        e.sig_piEE = 0.0
-        e.piEN = None
-        e.sig_piEN = None
-        e.fs = float(entries[66])       # -> 67 for second filter
-        e.sig_fs = 0.0
-        e.fb = None
-        e.sig_fb = None
-        e.s = float(entries[47])
-        e.sig_s = 0.0
-        e.q = float(entries[46])
-        e.sig_q = 0.0
-        e.alpha = float(entries[31])
-        e.sig_alpha = 0.0
-        e.dsdt = None                   # Can we derive these from the fit?
-        e.sig_dsdt = None
-        e.dadt = None
-        e.sig_dadt = None
-        e.t0_par = None
-        e.chisq  = float(entries[73])
-        e.M1 = float(entries[19])       # M_total or M1?
-        e.sig_M1 = None
-        e.M2 = float(entries[42])
-        e.sig_M2 = None
-        e.DL = float(entries[18])
-        e.sig_DL = None
-        e.DS = float(entries[9])
-        e.sig_DS = None
-        e.aperp = float(entries[43])    # a not aperp
-        e.sig_aperp = None
-        e.t_fit = 0.0
-        
-        for key, icol in pars.items():
-
-            if key in ['model_class']:
-                setattr(e, key, icol)
-            elif key in ['idx']:
-                setattr(e, key, int(entries[icol]))
-            else:
-                setattr(e, key, float(entries[icol]))
+        if '#' not in l:
+            entries = l.replace('\n','').split()
             
-            if key == 'idx':
-                setattr(e, 'modelID', 'ulwcd1_'+str(entries[icol]))
-                
-        master_data.append(e)
+            e = EventEntry()
+            
+            if 'dcnormffp' in l: # PSPL, inc FFP
+                pars = { 'model_class': 'PSPL',
+                         'idx': 95,
+                        }
+                        
+            elif 'ombin' in l: # Binary star
+                pars = { 'model_class': 'Binary_star',
+                         'idx': 81,
+                         }
+            
+            elif 'omcassan' in l:   # Bound planet
+                 pars = { 'model_class': 'Binary_planet',
+                         'idx': 81,
+                         }
+            
+            if 'dccv' in l: # CV
+                 pars = { 'model_class': 'CV',
+                         'idx': 79,
+                         }
+            
+            e.t0 = float(entries[32])
+            e.sig_t0 = 0.0
+            e.tE = float(entries[33])
+            e.sig_tE = 0.0
+            e.u0 = float(entries[30])
+            e.sig_u0 = 0.0
+            e.rho = float(entries[37])
+            e.sig_rho = 0.0
+            e.piEE = float(entries[36])     # piE -> piEN, piEE
+            e.sig_piEE = 0.0
+            e.piEN = None
+            e.sig_piEN = None
+            e.fs1 = float(entries[66])       # -> 67 for second filter
+            e.sig_fs1 = 0.0
+            e.fb1 = None
+            e.sig_fb1 = None
+            e.fs2 = float(entries[67])       # -> 67 for second filter
+            e.sig_fs2 = 0.0
+            e.fb2 = None
+            e.sig_fb2 = None
+            e.s = float(entries[47])
+            e.sig_s = 0.0
+            e.q = float(entries[46])
+            e.sig_q = 0.0
+            e.alpha = float(entries[31])
+            e.sig_alpha = 0.0
+            e.dsdt = None                   # Can we derive these from the fit?
+            e.sig_dsdt = None
+            e.dadt = None
+            e.sig_dadt = None
+            e.t0_par = None
+            e.chisq1  = float(entries[73])
+            e.chisq2  = float(entries[74])
+            e.M1 = float(entries[19])       # M_total or M1?
+            e.sig_M1 = None
+            e.M2 = float(entries[42])
+            e.sig_M2 = None
+            e.DL = float(entries[18])
+            e.sig_DL = None
+            e.DS = float(entries[9])
+            e.sig_DS = None
+            e.aperp = float(entries[43])    # a not aperp
+            e.sig_aperp = None
+            e.t_fit = 0.0
+            
+            for key, icol in pars.items():
     
+                if key in ['model_class']:
+                    setattr(e, key, icol)
+                elif key in ['idx']:
+                    setattr(e, key, int(entries[icol]))
+                else:
+                    setattr(e, key, float(entries[icol]))
+                
+                if key == 'idx':
+                    setattr(e, 'modelID', 'ulwcd1_'+str(entries[icol]))
+            
+            master_data.append(e)
+            
+            print(e.summary())
+            
+            cont = input('Continue? ')
+            
     return master_data
     
 if __name__ == '__main__':
