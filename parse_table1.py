@@ -32,14 +32,14 @@ class EventEntry():
         self.sig_piEE = None
         self.piEN = None
         self.sig_piEN = None
-        self.fs1 = None
-        self.sig_fs1 = None
-        self.fb1 = None
-        self.sig_fb1 = None
-        self.fs2 = None
-        self.sig_fs2 = None
-        self.fb2 = None
-        self.sig_fb2 = None
+        self.fs_W = None
+        self.sig_fs_W = None
+        self.fb_W = None
+        self.sig_fb_W = None
+        self.fs_Z = None
+        self.sig_fs_Z = None
+        self.fb_Z = None
+        self.sig_fb_Z = None
         self.s = None
         self.sig_s = None
         self.q = None
@@ -51,8 +51,8 @@ class EventEntry():
         self.dadt = None
         self.sig_dadt = None
         self.t0_par = None
-        self.chisq1  = None
-        self.chisq2  = None
+        self.chisq_W  = None
+        self.chisq_Z = None
         self.M1 = None
         self.sig_M1 = None
         self.M2 = None
@@ -81,14 +81,14 @@ class EventEntry():
                     ('sig_piEE', 'float', [-5.0,5.0], None),
                     ('piEN', 'float', [-5.0,5.0], None),
                     ('sig_piEN', 'float', [-5.0,5.0], None),
-                    ('fs1', 'float', [-500.0,500000.0], 'required'),
-                    ('sig_fs1', 'float', [0.0,50000.0], 'required'),
-                    ('fb1', 'float', [-500.0,50000.0], 'required'),
-                    ('sig_fb1', 'float', [0.0,50000.0], 'required'),
-                    ('fs2', 'float', [-500.0,500000.0], 'required'),
-                    ('sig_fs2', 'float', [0.0,50000.0], 'required'),
-                    ('fb2', 'float', [-500.0,50000.0], 'required'),
-                    ('sig_fb2', 'float', [0.0,50000.0], 'required'),
+                    ('fs_W', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs_W', 'float', [0.0,50000.0], 'required'),
+                    ('fb_W', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb_W', 'float', [0.0,50000.0], 'required'),
+                    ('fs_Z', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs_Z', 'float', [0.0,50000.0], 'required'),
+                    ('fb_Z', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb_Z', 'float', [0.0,50000.0], 'required'),
                     ('s', 'float', [0.0,50.0], 'required'),
                     ('sig_s', 'float', [0.0,50.0], 'required'),
                     ('q', 'float', [0.0,1.0], 'required'),
@@ -100,8 +100,8 @@ class EventEntry():
                     ('dadt', 'float', [0.0,6.4], None), 
                     ('sig_dadt', 'float', [0.0,6.4], None),
                     ('t0_par', 'float', [2450000.0,2470000.0], None), 
-                    ('chisq1', 'float', [0.0,1000000.0], 'required'), 
-                    ('chisq2', 'float', [0.0,1000000.0], 'required'), 
+                    ('chisq_W', 'float', [0.0,1000000.0], 'required'), 
+                    ('chisq_Z', 'float', [0.0,1000000.0], 'required'), 
                     ('M1', 'float', [0.0,20.0], None),
                     ('sig_M1', 'float', [0.0,20.0], None),
                     ('M2', 'float', [0.0,20.0], None),
@@ -219,14 +219,14 @@ def read_standard_ascii_DC_table(file_path):
     # Column 12: Uncertainty on πE,E<br>
     # Column 13: Parallax parameter πE,N<br>
     # Column 14: Uncertainty on πE,N<br>
-    # Column 15: Source flux, fs, filter 1 [counts/s] - priority<br>
-    # Column 16: Uncertainty in fs, filter 1 [counts/s] - priority<br>
-    # Column 17: Blend flux, fb, filter 1 [counts/s] - priority<br>
-    # Column 18: Uncertainty in fb, filter 1 [counts/s] - priority<br>
-    # Column 19: Source flux, fs, filter 2 [counts/s] - priority<br>
-    # Column 20: Uncertainty in fs, filter 2 [counts/s] - priority<br>
-    # Column 21: Blend flux, fb, filter 2 [counts/s] - priority<br>
-    # Column 22: Uncertainty in fb, filter 2 [counts/s] - priority<br>
+    # Column 15: Source flux, fs, filter W149 [counts/s] - priority<br>
+    # Column 16: Uncertainty in fs, filter W194 [counts/s] - priority<br>
+    # Column 17: Blend flux, fb, filter W149 [counts/s] - priority<br>
+    # Column 18: Uncertainty in fb, filter W149 [counts/s] - priority<br>
+    # Column 19: Source flux, fs, filter Z087 [counts/s] - priority<br>
+    # Column 20: Uncertainty in fs, filter Z087 [counts/s] - priority<br>
+    # Column 21: Blend flux, fb, filter Z087 [counts/s] - priority<br>
+    # Column 22: Uncertainty in fb, filter Z087 [counts/s] - priority<br>
     # Column 23: Binary separation, s, [normalised by θE] - priority<br>
     # Column 24: Uncertainty on s - priority<br>
     # Column 25: Mass ratio, q = M2/M1 - priority<br>
@@ -238,8 +238,8 @@ def read_standard_ascii_DC_table(file_path):
     # Column 31: Rate of change of alpha, dalpha/dt<br>
     # Column 32: Uncertainty on dalpha/dt<br>
     # Column 33: t0_par [days]<br>
-    # Column 34: Chi squared of the fitted model, filter 1<br>
-    # Column 34: Chi squared of the fitted model, filter 2<br>
+    # Column 34: Chi squared of the fitted model, filter W149<br>
+    # Column 34: Chi squared of the fitted model, filter Z087<br>
     # Column 35: Primary lens mass, M1 [Msolar]<br>
     # Column 36: Uncertainty on M1 [Msolar]<br>
     # Column 37: Secondary lens mass, M2 [MJupiter]<br>
@@ -261,56 +261,63 @@ def read_standard_ascii_DC_table(file_path):
     
     file_lines = open(file_path,'r').readlines()
     
-    event_list = []
-    data = []
+    model_data = {}
     header = []
     
     for i,line in enumerate(file_lines):
+
+        items = line.replace('\n','').split()
         
-        if line[0:1] != '#':
+        if line[0:1] == '#':
             
-            items = line.replace('\n','').split()
+            header = items[2:]
             
-            if len(header) == 0:
-                
-                header = items[2:]
-                
-            else:
-                
-                entry = EventEntry({'idx': (len(event_list)+1), 
-                                    'modelID': items[0], 
-                                    'model_class': items[1]})
-        
-                values = []
-                
-                for j,f in enumerate(items[2:]):
+        elif len(line.replace('\n','')) > 0:
+                            
+            entry = EventEntry({'idx': (len(model_data)+1), 
+                                'modelID': items[0], 
+                                'model_class': items[1]})
+    
+            values = []
+            
+            for j,f in enumerate(items[2:]):
+                                
+                if 'None' in str(f) or '-' in str(f):
                     
-                    print(j,f )
+                    values.append(np.nan)
                     
-                    if 'None' in str(f):
-                        
-                        values.append(np.nan)
-                        
-                    else:
-                        
-                        values.append(float(f))
-                        
-                        setattr(entry,header[j],float(f))
-                        
-                entry.self_check()
-                
-                if len(values) == 39:
+                elif str(f).isalpha():
                     
-                    event_list.append(entry)
-                    data.append(values)
-                
+                    values.append(str(f))
+                    
                 else:
                     
-                    print('Error parsing line '+str(i)+' in '+path.basename(file_path))
-                    
-    data = np.array(data)
-    
-    return event_list, data
+                    try:
+                        
+                        values.append(float(f))
+                        setattr(entry,header[j],float(f))
+                        
+                    except ValueError:
+                        
+                        values.append(str(f))
+                        setattr(entry,header[j],f)
+            
+            #print(entry.summary())
+            #cont = input('Continue? ')
+            
+            #entry.self_check()
+            
+            model_data[entry.modelID] = entry
+            
+            #if len(values) == 39:
+                
+            #    model_data[entry.modelID] = entry
+            
+            #else:
+                
+            #    print('Error parsing line '+str(i)+' in '+path.basename(file_path))
+                
+    return model_data
 
 def read_master_table(file_path):
     """Function to read the input file of the original simulation parameters
@@ -322,7 +329,7 @@ def read_master_table(file_path):
         
     lines = open(file_path,'r').readlines()
     
-    master_data = []
+    master_data = {}
     
     for i,l in enumerate(lines):
         
@@ -351,6 +358,12 @@ def read_master_table(file_path):
                          'idx': 79,
                          }
             
+            true_fs_W = float(entries[57])
+            true_fl_W = float(entries[63])
+            
+            true_fs_Z = float(entries[55])
+            true_fl_Z = float(entries[61])
+            
             e.t0 = float(entries[32])
             e.sig_t0 = 0.0
             e.tE = float(entries[33])
@@ -363,14 +376,14 @@ def read_master_table(file_path):
             e.sig_piEE = 0.0
             e.piEN = None
             e.sig_piEN = None
-            e.fs1 = float(entries[66])       # -> 67 for second filter
-            e.sig_fs1 = 0.0
-            e.fb1 = None
+            e.fs_W = float(entries[66])       # -> 67 for second filter
+            e.sig_fs_W = 0.0
+            e.fb_W = calc_fb(true_fs_W, e.fs_W, true_fl_W)
             e.sig_fb1 = None
-            e.fs2 = float(entries[67])       # -> 67 for second filter
-            e.sig_fs2 = 0.0
-            e.fb2 = None
-            e.sig_fb2 = None
+            e.fs_Z = float(entries[67])       # -> 67 for second filter
+            e.sig_fs_Z = 0.0
+            e.fb_Z = calc_fb(true_fs_Z, e.fs_Z, true_fl_Z)
+            e.sig_fb_Z = None
             e.s = float(entries[47])
             e.sig_s = 0.0
             e.q = float(entries[46])
@@ -406,15 +419,35 @@ def read_master_table(file_path):
                     setattr(e, key, float(entries[icol]))
                 
                 if key == 'idx':
-                    setattr(e, 'modelID', 'ulwcd1_'+str(entries[icol]))
+                    model_id = 'ulwdc1_'+add_lead_zeros(entries[icol],3)
+                    setattr(e, 'modelID', model_id)
             
-            master_data.append(e)
+            master_data[model_id] = e
             
-            print(e.summary())
+            #print(e.summary())
             
-            cont = input('Continue? ')
+            #cont = input('Continue? ')
             
     return master_data
+
+def calc_fb(true_fs, blend_fs, true_fl):
+    """Function to calculate the blended flux from the blended and true fluxes
+    of the lens and source"""
+    
+    true_fb = true_fs / (blend_fs*blend_fs*(true_fs + true_fl))
+    
+    return true_fb
+
+def add_lead_zeros(number,dp):
+    """Function to zero pad a given number, to the number of characters
+    indicated"""
+    
+    snumber = str(number)
+    
+    while len(snumber) < dp:
+        snumber = '0'+snumber
+    
+    return snumber
     
 if __name__ == '__main__':
     
@@ -429,11 +462,11 @@ if __name__ == '__main__':
         opt = argv[2]
 
     if 'Y' in opt or 'master' in opt:
-        event_list = read_master_table(file_path)
+        model_data = read_master_table(file_path)
     else:
-        (event_list, data) = read_standard_ascii_DC_table(file_path)
+        model_data = read_standard_ascii_DC_table(file_path)
     
-    for i in range(0,len(event_list),1):
+    for i in model_data.keys():
         
-        print(event_list[i].summary())
+        print(model_data[i].summary())
     
