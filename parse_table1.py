@@ -373,9 +373,9 @@ def read_master_table(file_path):
             true_fs_Z = float(entries[55])
             true_fl_Z = float(entries[61])
             
-            e.t0 = float(entries[32])
+            e.t0 = float(entries[32]) + 2458233.0
             e.sig_t0 = 0.0
-            e.tE = float(entries[33])
+            e.tE = float(entries[33]) 
             e.sig_tE = 0.0
             e.u0 = float(entries[30])
             e.sig_u0 = 0.0

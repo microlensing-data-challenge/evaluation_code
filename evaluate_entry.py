@@ -26,7 +26,11 @@ def evaluate_entry():
     
     check_classifications(params, master_data, entry_data, log)
     
-    compare_parameters(params, master_data, entry_data, log)
+    deltas = compare_parameters(params, master_data, entry_data, log)
+    
+    plot_deltas(params,deltas,log)
+    
+    compare_times(params,entry_data,log)
     
     log.info( 'Analysis complete\n' )
     logging.shutdown()
@@ -171,7 +175,9 @@ def check_classifications(params, master_data, entry_data, log):
     plt.legend()
     
     plt.savefig(path.join(params['log_dir'],'classifications.png'))
-
+    
+    plt.close(1)
+    
 def compare_class(true_class,entry_class):
     
     if true_class == 'PSPL' and entry_class == 'PSPL':
@@ -205,6 +211,14 @@ def compare_parameters(params, master_data, entry_data, log):
                 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', \
                 's', 'q', 'alpha', 'dsdt', 'dadt', 'M1', 'M2', 'DL', 'DS', 'aperp']
     fpars = start_html_file(path.join(params['log_dir'],'parameters_evaluation.html'),hdrs)
+
+    priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
+    
+    deltas = { }
+    for key in priority_pars:
+        deltas[key] = []
+        
+    log.info('Comparing parameter fitted values with those simulated')
     
     for modelID, model in master_data.items():
         
@@ -219,9 +233,9 @@ def compare_parameters(params, master_data, entry_data, log):
                 line = '<tr><td>'+str(modelID)+'</td>'
                 
                 if compare_class(true_class,entry_model.model_class):
-                    line = line + '<td>'+entry_model.model_class+'</td>'
+                    line = line + '<td>'+entry_model.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
                 else:
-                    line = line + '<td bgcolor="#F01F11">'+entry_model.model_class+'</td>'
+                    line = line + '<td bgcolor="#F08080">'+entry_model.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
                 
                 for par in par_list:
                     par_true = getattr(model,par)
@@ -229,17 +243,25 @@ def compare_parameters(params, master_data, entry_data, log):
                     par_error = getattr(entry_model,'sig_'+par)
                     
                     (dpar,within_1sig,within_3sig) = compare_parameter(par_true,par_fit,par_error)
-                    print(modelID, model.model_class, par,par_true,par_fit,par_error,within_1sig,within_3sig)
+                    
+                    #if par == 't0':   
+                     #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
                     
                     if within_1sig and within_3sig:
-                        line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + '</td>'
+                        line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + \
+                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
                         
                     elif within_1sig == False and within_3sig:
-                        line = line + ' <td bgcolor="#FFB623"> ' + str(par_fit)+' &plusmn; '+str(par_error)+'</td>'
+                        line = line + ' <td bgcolor="#F7DC6F"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
+                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
                         
                     else:
-                        line = line + ' <td bgcolor="#F01F11"> ' + str(par_fit)+' &plusmn; '+str(par_error)+'</td>'
-                
+                        line = line + ' <td bgcolor="#F08080"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
+                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                        
+                    if dpar != None and par in priority_pars:
+                        deltas[par].append(dpar)
+                        
                 line = line + ' <td> '+str(entry_model.chisq_W)+' </td></tr>\n'
                 
                 fpars.write(line)
@@ -256,6 +278,8 @@ def compare_parameters(params, master_data, entry_data, log):
     fpars.write('</html>\n')
     fpars.close()
 
+    return deltas
+    
 def compare_parameter(true_par,fitted_par,fitted_error):
     """Function to compare a fitted numerical parameter with the true model value"""
     
@@ -273,31 +297,138 @@ def compare_parameter(true_par,fitted_par,fitted_error):
         delta_par = true_par - fitted_par
         
         if fitted_error != None:
-            one_sig = abs(fitted_par - fitted_error)
-            three_sig = abs(fitted_par - (fitted_error * 3.0))
             
-            if abs(delta_par) <= one_sig:
+            if abs(delta_par) <= fitted_error:
                 within_1sig = True
                 within_3sig = True
                 
-            if abs(delta_par) > one_sig and abs(delta_par) <= three_sig:
+            if abs(delta_par) > fitted_error and abs(delta_par) <= (3.0*fitted_error):
                 within_3sig = True
     
     elif true_par == None and fitted_par != None:
         
-        delta_par = 0.0
+        delta_par = None
         
     elif true_par != None and fitted_par == None:
         
         delta_par = None
         
     return delta_par, within_1sig, within_3sig
+
+def plot_deltas(params,deltas,log):
+    """Function to plot distributions of the differences between the fitted 
+    and true parameters"""
+
+    priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
+    headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff']
     
-def compare_times():
+    # xmin, xmax, nbins
+    plot_limits = {'t0': [-20.0, 20.0, 200],
+                'tE': [-20.0, 20.0, 200],
+                'u0': [-2.0, 2.0, 200],
+                'piE': [-5.0, 5.0, 200],
+                'fs_W': [-1e4, 1e4, 200],
+                'fb_W': [-1e4, 1e4, 200],
+                'fs_Z': [-1e4, 1e4, 200],
+                'fb_Z': [-1e4, 1e4, 200],
+                's': [-5.0, 5.0, 200],
+                'q': [-5.0, 5.0, 200],
+                'alpha': [-5.0, 5.0, 100],
+                }
+    log.info('Plotting distributions between fitted and true parameters')
+    log.info('\n Parameter mean_diff, median_diff, St.Dev min  max')
+    
+    f = start_html_file(path.join(params['log_dir'],'parameter_stats_table.html'),
+                        headers)
+    
+    for par,values in deltas.items():
+        
+        data = np.array(values)
+        
+        median = np.median(data)
+        
+        limits = plot_limits[par]
+        
+        fig = plt.figure(1,(10,10))
+        
+        plt.subplot(1,1,1)
+    
+        (n, bins, patches) = plt.hist(data, limits[2], facecolor='g', alpha=0.75)
+        
+        plt.xlabel('$\delta '+par+'$')
+        plt.ylabel('Frequency')
+        
+        (xmin,xmax,ymin,ymax) = plt.axis()
+        plt.axis([data.min(),data.max(),ymin,ymax])
+        
+        plt.grid(True)
+        
+        plt.savefig(path.join(params['log_dir'],'delta_'+par+'_distribution.png'), bbox_inches='tight')
+
+        plt.close(1)
+        
+        median = np.median(data)
+        
+        log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max()))
+        f.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td></tr>\n')
+        
+    f.write('</table>\n')
+    f.write('</body>\n')
+    f.write('</html>\n')
+    f.close()
+
+def compare_times(params,entry_data,log):
     """Function to evaluate the time taken to fit models"""
     
-    pass
+    log.info('Plotting distribution of time taken for fit')
+    
+    ts_pspl = []
+    ts_binary = []
+    for modelID, model in entry_data.items():
+        if model.t_fit != None and model.model_class == 'PSPL':
+            ts_pspl.append(model.t_fit)
+            
+        if model.t_fit != None and model.model_class in ['USBL', 'Binary_star', 'Binary_planet']:
+            ts_binary.append(model.t_fit)
+    
+    ts_pspl = np.array(ts_pspl)
+    ts_binary = np.array(ts_binary)
+    
+    fig = plt.figure(1,(10,10))
+        
+    plt.subplot(1,1,1)
+    
+    if len(ts_pspl) > 0:
+        (n, bins, patches) = plt.hist(ts_pspl, 50, facecolor='g', alpha=0.75,
+                                label='PSPL fits')
+        
+    if len(ts_binary) > 0:
+        (n, bins, patches) = plt.hist(ts_binary, 50, facecolor='m', alpha=0.75,
+                                label='Binary fits')
+    
+    plt.xlabel('Time to fit [hrs]')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.legend()
+    
+    plt.savefig(path.join(params['log_dir'],'time_to_fit_distribution.png'), bbox_inches='tight')
 
+    plt.close(1)
+    
+    if len(ts_pspl) > 0:
+        median_pspl = np.median(ts_pspl)
+        log.info('Median time taken for PSPL fit '+str(median_pspl)+\
+                                    ' std.dev. '+str(ts_pspl.std()))
+    else:
+        log.info('Fitting times not recorded for PSPL models')
+        
+    if len(ts_binary) > 0:
+        median_binary = np.median(ts_binary)
+        log.info('Median time taken for binary fit '+str(median_binary)+\
+                                    ' std.dev. '+str(ts_binary.std()))
+    else:
+        log.info('Fitting times not recorded for binary models')
+                                    
 def start_html_file(file_path,header):
     """Function to start an HTML format table file"""
     
