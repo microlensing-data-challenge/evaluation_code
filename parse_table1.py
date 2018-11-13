@@ -204,7 +204,7 @@ class EventEntry():
             output += ' '+key+'='+repr(getattr(self,key))
             
         return output
-        
+    
 def read_standard_ascii_DC_table(file_path):
     """Function to read a Data Challenge entry table in standard ASCII format
     
@@ -285,7 +285,7 @@ def read_standard_ascii_DC_table(file_path):
             values = []
             
             for j,f in enumerate(items[2:]):
-                                
+                
                 if 'None' in str(f) or len(str(f).replace('-','')) == 0:
                     
                     values.append(np.nan)
@@ -315,9 +315,15 @@ def read_standard_ascii_DC_table(file_path):
                 entry.piE = np.sqrt( entry.piEE*entry.piEE + entry.piEN*entry.piEN )
                 entry.sig_piE = np.sqrt( (entry.sig_piEE*entry.sig_piEE) + \
                                         (entry.sig_piEN*entry.sig_piEN) )
-                
-            model_data[entry.modelID] = entry
             
+            if entry.t0 != None and entry.t0 < 2450000.0:
+                entry.t0 = entry.t0 + 2450000.0
+            
+            if entry.modelID in model_data.keys():
+                model_data[entry.modelID].append(entry)
+            else:
+                model_data[entry.modelID] = [entry]
+                
             #if len(values) == 39:
                 
             #    model_data[entry.modelID] = entry
@@ -373,7 +379,7 @@ def read_master_table(file_path):
             true_fs_Z = float(entries[55])
             true_fl_Z = float(entries[61])
             
-            e.t0 = float(entries[32]) + 2458233.0
+            e.t0 = float(entries[32]) + 2458234.0
             e.sig_t0 = 0.0
             e.tE = float(entries[33]) 
             e.sig_tE = 0.0
@@ -420,6 +426,21 @@ def read_master_table(file_path):
             e.sig_aperp = None
             e.t_fit = 0.0
             
+            phase0 = float(entries[45]) * (np.pi/180.0) # deg -> rads
+            inc = float(entries[44]) * (np.pi/180.0) # deg -> rads
+            period = float(entries[48]) * 365.24 # years -> days
+            RE = float(entries[34])
+            a = float(entries[43])/RE       # AU -> thetaE
+            alpha0 = float(entries[31]) * (np.pi/180.0) # deg -> rads
+            t_ref = float(entries[32])
+            t = t_ref - 1.0
+            
+            (dsdt, dalphadt) = calc_orbital_parameters(phase0, inc, period, 
+                                                        a, e.q, alpha0, 
+                                                        t_ref, t)
+            e.dsdt = dsdt
+            e.dadt = dalphadt
+            
             for key, icol in pars.items():
     
                 if key in ['model_class']:
@@ -433,6 +454,24 @@ def read_master_table(file_path):
                     model_id = 'ulwdc1_'+add_lead_zeros(entries[icol],3)
                     setattr(e, 'modelID', model_id)
             
+            # Remove binary parameter from PSPL events, unnecessarily 
+            # present in the input data file:
+            if e.model_class == 'PSPL' or e.model_class == 'CV':
+                e.s = None
+                e.sig_s = None
+                e.q = None
+                e.sig_q = None
+                e.alpha = None
+                e.sig_alpha = None
+                e.dsdt = None
+                e.sig_dsdt = None
+                e.dadt = None
+                e.sig_dadt = None
+                e.M2 = None
+                e.sig_M2 = None
+                e.aperp = None
+                e.sig_aperp = None
+                
             master_data[model_id] = e
             
             #print(e.summary())
@@ -448,7 +487,62 @@ def calc_fb(true_fs, blend_fs, true_fl):
     true_fb = true_fs / (blend_fs*blend_fs*(true_fs + true_fl))
     
     return true_fb
+    
 
+def calc_orbital_parameters(phase, inc, period, a, q, alpha0, t_ref, t,
+                            verbose=False):
+    """Method to calculate ds/dt and dalpha/dt from circular orbital 
+    parameters
+    All input angles are expected to be in radians
+    All input times are expected to be in days
+    Separation, a, is expected to be normalised by thetaE
+    """
+    
+    phi = (np.pi/180.0)*phase + (t-t_ref)/period
+    phi_ref = (np.pi/180.0)*phase
+    if verbose: print('Phi = '+str(phi)+', phi_ref = '+str(phi_ref))
+    
+    a1 = q/(1+q)*a
+    a2 = a - a1
+    if verbose: print('a1 = '+str(a1)+', a2 = '+str(a2))
+    
+    cosinc = np.cos(inc)
+
+    # Lens host star position
+    x1 = a1 * np.cos(phi + np.pi)
+    y1 = a1 * np.sin(phi + np.pi) * cosinc
+    x1_ref = a1 * np.cos(phi_ref + np.pi)
+    y1_ref = a1 * np.sin(phi_ref + np.pi) * cosinc
+    if verbose: 
+        print('Lens host star positions')
+        print('x1,y1 = '+str(x1)+', '+str(y1))
+        print('x1,y1 ref = '+str(x1_ref)+', '+str(y1_ref))
+    
+    # Companion position
+    x2 = a2 * np.cos(phi)
+    y2 = a2 * np.sin(phi) * cosinc
+    x2_ref = a2 * np.cos(phi_ref)
+    y2_ref = a2 * np.sin(phi_ref) * cosinc
+    if verbose: 
+        print('Lens companion positions')
+        print('x2,y2 = '+str(x2)+', '+str(y2))
+        print('x2,y2 ref = '+str(x2_ref)+', '+str(y2_ref))
+    
+    s = np.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) )
+    s_ref = np.sqrt( (x2_ref-x1_ref)*(x2_ref-x1_ref) + \
+                     (y2_ref-y1_ref)*(y2_ref-y1_ref) )
+    if verbose: print('s = '+str(s)+', s_ref = '+str(s_ref))
+    
+    dsdt = ((s - s_ref)/(t-t_ref))*365.24   # Rate of change per day -> year
+    
+    alpha = alpha0 - np.arctan2(y2,x2)
+    alpha_ref = alpha0 - np.arctan2(y2_ref,x2_ref)
+    if verbose: print('alpha = '+str(alpha)+', alpha_ref = '+str(alpha_ref))
+    
+    dalphadt = ((alpha - alpha_ref)/(t-t_ref))*365.24 # Per day -> year
+    
+    return dsdt, dalphadt
+    
 def add_lead_zeros(number,dp):
     """Function to zero pad a given number, to the number of characters
     indicated"""
@@ -479,15 +573,16 @@ if __name__ == '__main__':
     
     counts = {}
     
-    for i in model_data.keys():
+    for i,model_list in model_data.items():
         
-        print(model_data[i].summary())
-        
-        if model_data[i].model_class in counts.keys():
-            n = counts[model_data[i].model_class] + 1
-            counts[model_data[i].model_class] = n
-        else:
-            counts[model_data[i].model_class] = 1
+        for m in model_list:
+            print(m.summary())
+            
+            if m.model_class in counts.keys():
+                n = counts[m.model_class] + 1
+                counts[m.model_class] = n
+            else:
+                counts[m.model_class] = 1
     
     for key, value in counts.items():
         print(str(value)+' of '+key+' class')

@@ -15,7 +15,13 @@ import numpy as np
 def evaluate_entry():
     """Function to evaluate the numerical data from a data challenge entry, 
     by comparing the fitted numerical parameters with the master table data"""
-        
+    
+    
+    categories = { 'PSPL': ['PSPL','single-lens'],
+                   'Binary_star': ['USBL','binary-lens'],
+                   'Binary_planet': ['USBL','binary-lens'],
+                   'CV': ['CV','Variable','variable'] }
+                
     params = get_args()
     
     log = start_log( params['log_file'] )
@@ -24,13 +30,13 @@ def evaluate_entry():
     
     entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'])
     
-    check_classifications(params, master_data, entry_data, log)
+    check_classifications(params, master_data, entry_data, categories, log)
     
-    deltas = compare_parameters(params, master_data, entry_data, log)
+    deltas = compare_parameters(params, master_data, entry_data, categories, log)
     
     plot_deltas(params,deltas,log)
     
-    compare_times(params,entry_data,log)
+    compare_times(params,entry_data,categories,log)
     
     log.info( 'Analysis complete\n' )
     logging.shutdown()
@@ -104,16 +110,16 @@ def get_args():
         
     return params
 
-def check_classifications(params, master_data, entry_data, log):
+def check_classifications(params, master_data, entry_data, categories, log):
     """Function to check whether models have been correctly classified"""
     
     log.info('Checking model classifications')
     
     # For each class, record [ n_good, n_bad ] classifications
-    classes = { 'PSPL': {'n_good': 0, 'n_bad': 0, 'names': ['PSPL']},
-                'Binary_star': {'n_good': 0, 'n_bad': 0, 'names': ['USBL']},
-                'Binary_planet': {'n_good': 0, 'n_bad': 0, 'names': ['USBL']},
-                'CV': {'n_good': 0, 'n_bad': 0, 'names': ['CV','Variable']}, }
+    classes = { 'PSPL': {'n_good': 0, 'n_bad': 0, 'names': categories['PSPL']},
+                'Binary_star': {'n_good': 0, 'n_bad': 0, 'names': categories['Binary_star']},
+                'Binary_planet': {'n_good': 0, 'n_bad': 0, 'names': categories['Binary_planet']},
+                'CV': {'n_good': 0, 'n_bad': 0, 'names': categories['CV']} }
     
     true_classes = list_classes(master_data)
     fitted_classes = list_classes(entry_data)
@@ -126,21 +132,22 @@ def check_classifications(params, master_data, entry_data, log):
         
         if modelID in entry_data.keys():
             
-            entry_model = entry_data[modelID]
+            entry_models = entry_data[modelID]
             
-            confuse_matrix = record_confusion_matrix(true_class,entry_model.model_class,
-                                                     confuse_matrix,
-                                                     true_classes,fitted_classes)
-                            
-            if entry_model.model_class in c['names']:
-                c['n_good'] += 1
-                log.info(' -> '+modelID+' ('+str(model.idx)+') correctly classified: true: '+true_class+\
-                                    ' entry: '+entry_model.model_class)
+            for m in entry_models:
+                confuse_matrix = record_confusion_matrix(true_class,m.model_class,
+                                                         confuse_matrix,
+                                                         true_classes,fitted_classes)
                 
-            else:
-                c['n_bad'] += 1
-                log.info(' -> '+modelID+' ('+str(model.idx)+') misclassified: true: '+true_class+\
-                                    ' entry: '+entry_model.model_class)
+                if m.model_class in c['names']:
+                    c['n_good'] += 1
+                    log.info(' -> '+modelID+' ('+str(model.idx)+') correctly classified: true: '+true_class+\
+                                        ' entry: '+m.model_class)
+                    
+                else:
+                    c['n_bad'] += 1
+                    log.info(' -> '+modelID+' ('+str(model.idx)+') misclassified: true: '+true_class+\
+                                        ' entry: '+m.model_class)
                                     
         else:
             
@@ -148,7 +155,7 @@ def check_classifications(params, master_data, entry_data, log):
         
         classes[true_class] = c
     
-    log.info('Number of events classified:')
+    log.info('Number of classifications:')
     
     good_classes = []
     bad_classes = []
@@ -170,7 +177,6 @@ def check_classifications(params, master_data, entry_data, log):
     p1 = plt.bar(axticks-bwidth/2.0, good_classes, 
                          bwidth, color='r', label='Accurately classified')
 
-    
     p2 = plt.bar(axticks+bwidth/2.0, bad_classes, 
                          bwidth, color='k', label='Misclassified')
     
@@ -208,29 +214,39 @@ def list_classes(event_list):
     
     class_list = []
     
-    for entryID,entry in event_list.items():
-
-        if entry.model_class not in class_list:
+    for entryID, entry in event_list.items():
+        
+        if type(entry) == type([]):
             
-            class_list.append(entry.model_class)
-    
+            for m in entry:
+                
+                if m.model_class not in class_list:
+                    
+                    class_list.append(m.model_class)
+            
+        else:
+            
+            if entry.model_class not in class_list:
+                    
+                class_list.append(entry.model_class)
+                
     return class_list
     
-def compare_class(true_class,entry_class):
+def compare_class(true_class,entry_class,categories):
     
-    if true_class == 'PSPL' and entry_class == 'PSPL':
+    if true_class == 'PSPL' and entry_class in categories['PSPL']:
         
         return True
         
-    if true_class == 'Binary_star' and entry_class == 'USBL':
+    if true_class == 'Binary_star' and entry_class in categories['Binary_star']:
         
         return True
         
-    if true_class == 'Binary_planet' and entry_class == 'USBL':
+    if true_class == 'Binary_planet' and entry_class in categories['Binary_planet']:
         
         return True
     
-    if true_class == 'CV' and entry_class in ['CV','Variable']:
+    if true_class == 'CV' and entry_class in categories['CV']:
         
         return True
     
@@ -247,7 +263,8 @@ def record_confusion_matrix(true_class,fitted_class,confuse_matrix,
     
     return confuse_matrix
     
-def compare_parameters(params, master_data, entry_data, log):
+def compare_parameters(params, master_data, entry_data, categories,
+                       log, colour_coding=False):
     """Function to compare the entry's fitted parameters with those from the
     master table"""
     
@@ -260,7 +277,7 @@ def compare_parameters(params, master_data, entry_data, log):
                 's', 'q', 'alpha', 'dsdt', 'dadt', 'M1', 'M2', 'DL', 'DS', 'aperp']
     fpars = start_html_file(path.join(params['log_dir'],'parameters_evaluation.html'),hdrs)
 
-    priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
+    priority_pars = ['t0', 'tE', 'u0', 'piE', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     
     deltas = { }
     for key in priority_pars:
@@ -274,45 +291,52 @@ def compare_parameters(params, master_data, entry_data, log):
     
         if modelID in entry_data.keys():
             
-            entry_model = entry_data[modelID]
+            entry_models = entry_data[modelID]
             
-            if true_class in [ 'PSPL', 'Binary_star', 'Binary_planet']:
-                
-                line = '<tr><td>'+str(modelID)+'</td>'
-                
-                if compare_class(true_class,entry_model.model_class):
-                    line = line + '<td>'+entry_model.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
-                else:
-                    line = line + '<td bgcolor="#F08080">'+entry_model.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
-                
-                for par in par_list:
-                    par_true = getattr(model,par)
-                    par_fit = getattr(entry_model,par)
-                    par_error = getattr(entry_model,'sig_'+par)
+            for m in entry_models:
+                if true_class in [ 'PSPL', 'Binary_star', 'Binary_planet']:
                     
-                    (dpar,within_1sig,within_3sig) = compare_parameter(par_true,par_fit,par_error)
+                    line = '<tr><td>'+str(modelID)+'</td>'
                     
-                    #if par == 't0':   
-                     #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
-                    
-                    if within_1sig and within_3sig:
-                        line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + \
-                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
-                        
-                    elif within_1sig == False and within_3sig:
-                        line = line + ' <td bgcolor="#F7DC6F"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
-                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
-                        
+                    if compare_class(true_class,m.model_class,categories):
+                        line = line + '<td>'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
+                    elif compare_class(true_class,m.model_class,categories) == False and colour_coding:
+                        line = line + '<td bgcolor="#F08080">'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
                     else:
-                        line = line + ' <td bgcolor="#F08080"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
-                                '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                        line = line + '<td>'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
                         
-                    if dpar != None and par in priority_pars:
-                        deltas[par].append(dpar)
+                    for par in par_list:
+                        par_true = getattr(model,par)
+                        par_fit = getattr(m,par)
+                        par_error = getattr(m,'sig_'+par)
                         
-                line = line + ' <td> '+str(entry_model.chisq_W)+' </td></tr>\n'
-                
-                fpars.write(line)
+                        (dpar,within_1sig,within_3sig) = compare_parameter(par_true,par_fit,par_error)
+                        
+                        #if par == 't0':   
+                         #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
+                        
+                        if colour_coding:
+                            if within_1sig and within_3sig:
+                                line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + \
+                                        '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                                
+                            elif within_1sig == False and within_3sig:
+                                line = line + ' <td bgcolor="#F7DC6F"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
+                                        '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                                
+                            else:
+                                line = line + ' <td bgcolor="#F08080"> ' + str(par_fit)+' &plusmn; '+str(par_error)+\
+                                        '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                        else:
+                            line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + \
+                                        '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
+                                        
+                        if dpar != None and par in priority_pars:
+                            deltas[par].append(dpar)
+                            
+                    line = line + ' <td> '+str(m.chisq_W)+' </td></tr>\n'
+                    
+                    fpars.write(line)
         else:
             
             if true_class in [ 'PSPL', 'Binary_star', 'Binary_planet']:
@@ -425,39 +449,51 @@ def plot_deltas(params,deltas,log):
     f.write('</html>\n')
     f.close()
 
-def compare_times(params,entry_data,log):
+def compare_times(params,entry_data,categories,log):
     """Function to evaluate the time taken to fit models"""
     
     log.info('Plotting distribution of time taken for fit')
     
+    
     ts_pspl = []
     ts_binary = []
-    for modelID, model in entry_data.items():
-        if model.t_fit != None and model.model_class == 'PSPL':
-            ts_pspl.append(model.t_fit)
-            
-        if model.t_fit != None and model.model_class in ['USBL', 'Binary_star', 'Binary_planet']:
-            ts_binary.append(model.t_fit)
+    
+    for modelID, model_list in entry_data.items():
+        
+        for m in model_list:
+            if m.t_fit != None and m.model_class in categories['PSPL']:
+                ts_pspl.append(m.t_fit)
+                
+            if m.t_fit != None and m.model_class in categories['Binary_star']:
+                ts_binary.append(m.t_fit)
     
     ts_pspl = np.array(ts_pspl)
     ts_binary = np.array(ts_binary)
     
-    fig = plt.figure(1,(10,10))
+    fig = plt.figure(1,(20,10))
         
-    plt.subplot(1,1,1)
+    plt.subplot(1,2,1)
     
     if len(ts_pspl) > 0:
         (n, bins, patches) = plt.hist(ts_pspl, 50, facecolor='g', alpha=0.75,
                                 label='PSPL fits')
         
-    if len(ts_binary) > 0:
-        (n, bins, patches) = plt.hist(ts_binary, 50, facecolor='m', alpha=0.75,
-                                label='Binary fits')
-    
+    plt.title('PSPL fits')
     plt.xlabel('Time to fit [hrs]')
     plt.ylabel('Frequency')
     plt.grid(True)
-    plt.legend()
+    
+    if len(ts_binary) > 0:
+        plt.subplot(1,2,2)
+        
+        if len(ts_binary) > 0:
+            (n, bins, patches) = plt.hist(ts_binary, 50, facecolor='m', alpha=0.75,
+                                    label='Binary fits')
+        
+        plt.title('Binary fits')
+        plt.xlabel('Time to fit [hrs]')
+        plt.ylabel('Frequency')
+        plt.grid(True)
     
     plt.savefig(path.join(params['log_dir'],'time_to_fit_distribution.png'), bbox_inches='tight')
 
