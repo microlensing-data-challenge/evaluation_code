@@ -28,6 +28,8 @@ class EventEntry():
         self.sig_u0 = None
         self.rho = None
         self.sig_rho = None
+        self.piE = None
+        self.sig_piE = None
         self.piEE = None
         self.sig_piEE = None
         self.piEN = None
@@ -77,6 +79,8 @@ class EventEntry():
                     ('sig_u0', 'float', [-5.0,5.0], 'required'),
                     ('rho', 'float', [0.0,1.0], None),
                     ('sig_rho', 'float', [0.0,1.0], None),
+                    ('piE','float', [-5.0,5.0], None), 
+                    ('sig_piE', 'float', [-5.0,5.0], None),
                     ('piEE','float', [-5.0,5.0], None), 
                     ('sig_piEE', 'float', [-5.0,5.0], None),
                     ('piEN', 'float', [-5.0,5.0], None),
@@ -282,7 +286,7 @@ def read_standard_ascii_DC_table(file_path):
             
             for j,f in enumerate(items[2:]):
                                 
-                if 'None' in str(f) or '-' in str(f):
+                if 'None' in str(f) or len(str(f).replace('-','')) == 0:
                     
                     values.append(np.nan)
                     
@@ -301,12 +305,17 @@ def read_standard_ascii_DC_table(file_path):
                         
                         values.append(str(f))
                         setattr(entry,header[j],f)
-            
+                
             #print(entry.summary())
             #cont = input('Continue? ')
             
             #entry.self_check()
             
+            if entry.piEE != None and entry.piEN != None:
+                entry.piE = np.sqrt( entry.piEE*entry.piEE + entry.piEN*entry.piEN )
+                entry.sig_piE = np.sqrt( (entry.sig_piEE*entry.sig_piEE) + \
+                                        (entry.sig_piEN*entry.sig_piEN) )
+                
             model_data[entry.modelID] = entry
             
             #if len(values) == 39:
@@ -372,8 +381,10 @@ def read_master_table(file_path):
             e.sig_u0 = 0.0
             e.rho = float(entries[37])
             e.sig_rho = 0.0
-            e.piEE = float(entries[36])     # piE -> piEN, piEE
-            e.sig_piEE = 0.0
+            e.piE = float(entries[36])     # piE -> piEN, piEE
+            e.sig_piE = 0.0
+            e.piEE = None
+            e.sig_piEE = None
             e.piEN = None
             e.sig_piEN = None
             e.fs_W = float(entries[66])       # -> 67 for second filter
