@@ -477,7 +477,18 @@ if __name__ == '__main__':
     else:
         model_data = read_standard_ascii_DC_table(file_path)
     
+    counts = {}
+    
     for i in model_data.keys():
         
         print(model_data[i].summary())
+        
+        if model_data[i].model_class in counts.keys():
+            n = counts[model_data[i].model_class] + 1
+            counts[model_data[i].model_class] = n
+        else:
+            counts[model_data[i].model_class] = 1
     
+    for key, value in counts.items():
+        print(str(value)+' of '+key+' class')
+        

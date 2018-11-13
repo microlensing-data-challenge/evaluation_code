@@ -115,6 +115,10 @@ def check_classifications(params, master_data, entry_data, log):
                 'Binary_planet': {'n_good': 0, 'n_bad': 0, 'names': ['USBL']},
                 'CV': {'n_good': 0, 'n_bad': 0, 'names': ['CV','Variable']}, }
     
+    true_classes = list_classes(master_data)
+    fitted_classes = list_classes(entry_data)
+    confuse_matrix = np.zeros([len(true_classes),len(fitted_classes)])
+    
     for modelID, model in master_data.items():
         
         true_class = model.model_class
@@ -124,6 +128,10 @@ def check_classifications(params, master_data, entry_data, log):
             
             entry_model = entry_data[modelID]
             
+            confuse_matrix = record_confusion_matrix(true_class,entry_model.model_class,
+                                                     confuse_matrix,
+                                                     true_classes,fitted_classes)
+                            
             if entry_model.model_class in c['names']:
                 c['n_good'] += 1
                 log.info(' -> '+modelID+' ('+str(model.idx)+') correctly classified: true: '+true_class+\
@@ -174,9 +182,39 @@ def check_classifications(params, master_data, entry_data, log):
     plt.grid(True)
     plt.legend()
     
-    plt.savefig(path.join(params['log_dir'],'classifications.png'))
+    plt.savefig(path.join(params['log_dir'],'classifications.png'),bbox_inches='tight')
     
     plt.close(1)
+
+    fig = plt.figure(2,(10,10))
+    
+    plt.imshow(confuse_matrix, interpolation='nearest', cmap=plt.cm.Blues)
+    
+    plt.colorbar()
+    
+    xtick_marks = np.arange(len(fitted_classes))
+    plt.xticks(xtick_marks, fitted_classes, rotation=45)
+    ytick_marks = np.arange(len(true_classes))
+    plt.yticks(ytick_marks, true_classes)
+
+    plt.ylabel('True class')
+    plt.xlabel('Fitted class')
+    
+    plt.savefig(path.join(params['log_dir'],'confusion_matrix.png'),bbox_inches='tight')
+    
+    plt.close(2)
+    
+def list_classes(event_list):
+    
+    class_list = []
+    
+    for entryID,entry in event_list.items():
+
+        if entry.model_class not in class_list:
+            
+            class_list.append(entry.model_class)
+    
+    return class_list
     
 def compare_class(true_class,entry_class):
     
@@ -198,7 +236,17 @@ def compare_class(true_class,entry_class):
     
     return False
     
-
+def record_confusion_matrix(true_class,fitted_class,confuse_matrix,
+                            true_classes,fitted_classes):
+    """Function to log which objects are identified as which classes"""
+    
+    itrue = true_classes.index(true_class)
+    ifit = fitted_classes.index(fitted_class)
+    
+    confuse_matrix[itrue,ifit] += 1
+    
+    return confuse_matrix
+    
 def compare_parameters(params, master_data, entry_data, log):
     """Function to compare the entry's fitted parameters with those from the
     master table"""
