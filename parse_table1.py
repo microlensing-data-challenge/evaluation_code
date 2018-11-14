@@ -205,7 +205,7 @@ class EventEntry():
             
         return output
     
-def read_standard_ascii_DC_table(file_path):
+def read_standard_ascii_DC_table(file_path,page=False):
     """Function to read a Data Challenge entry table in standard ASCII format
     
     Expected format:
@@ -277,9 +277,15 @@ def read_standard_ascii_DC_table(file_path):
             header = items[2:]
             
         elif len(line.replace('\n','')) > 0:
-                            
+            
+            modelID = items[0]
+            if modelID.replace('ulwdc','')[0:1] != '_':
+                modelID = 'ulwdc1_'+modelID.replace('ulwdc','')
+            if len(str(modelID).split('_')) > 2:
+                modelID = '_'.join(str(modelID).split('_')[0:2])
+            
             entry = EventEntry({'idx': (len(model_data)+1), 
-                                'modelID': items[0], 
+                                'modelID': modelID, 
                                 'model_class': items[1]})
     
             values = []
@@ -305,9 +311,10 @@ def read_standard_ascii_DC_table(file_path):
                         
                         values.append(str(f))
                         setattr(entry,header[j],f)
-                
-            #print(entry.summary())
-            #cont = input('Continue? ')
+            
+            if page:
+                print(entry.summary())
+                cont = input('Continue? ')
             
             #entry.self_check()
             
@@ -334,7 +341,7 @@ def read_standard_ascii_DC_table(file_path):
                 
     return model_data
 
-def read_master_table(file_path):
+def read_master_table(file_path,page=False):
     """Function to read the input file of the original simulation parameters
     per event"""
     
@@ -474,9 +481,9 @@ def read_master_table(file_path):
                 
             master_data[model_id] = e
             
-            #print(e.summary())
-            
-            #cont = input('Continue? ')
+            if page:
+                print(e.summary())
+                cont = input('Continue? ')
             
     return master_data
 
@@ -556,25 +563,36 @@ def add_lead_zeros(number,dp):
     
 if __name__ == '__main__':
     
-    if len(argv) == 1:
+    if len(argv) < 4:
         
         file_path = input('Please enter the path to the table file: ')
         opt = input('Is this a master table? Y or n: ')
+        page = input('Page through entries? Y or n: ')
         
     else:
         
         file_path = argv[1]
         opt = argv[2]
-
-    if 'Y' in opt or 'master' in opt:
-        model_data = read_master_table(file_path)
+        page = argv[3]
+    
+    if 'Y' in page:
+        page = True
     else:
-        model_data = read_standard_ascii_DC_table(file_path)
+        page = False
+        
+    if 'Y' in opt or 'master' in opt:
+        model_data = read_master_table(file_path,page=page)
+    else:
+        model_data = read_standard_ascii_DC_table(file_path,page=page)
     
     counts = {}
     
     for i,model_list in model_data.items():
         
+        if 'Y' in opt or 'master' in opt:
+            model_list = [ model_list ]
+        else:
+            pass
         for m in model_list:
             print(m.summary())
             

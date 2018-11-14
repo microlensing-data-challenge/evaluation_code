@@ -12,31 +12,33 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
-def evaluate_entry():
+def evaluate_entry(teamID=None):
     """Function to evaluate the numerical data from a data challenge entry, 
     by comparing the fitted numerical parameters with the master table data"""
     
     
     categories = { 'PSPL': ['PSPL','single-lens'],
                    'Binary_star': ['USBL','binary-lens'],
-                   'Binary_planet': ['USBL','binary-lens'],
+                   'Binary_planet': ['USBL','binary-lens', 'planet'],
                    'CV': ['CV','Variable','variable'] }
                 
     params = get_args()
     
     log = start_log( params['log_file'] )
     
+    summary = start_html_file(file_path,title=teamID)
+    
     master_data = parse_table1.read_master_table(params['master_file'])
     
     entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'])
     
-    check_classifications(params, master_data, entry_data, categories, log)
+    summary = check_classifications(params, master_data, entry_data, categories, summary, log)
     
-    deltas = compare_parameters(params, master_data, entry_data, categories, log)
+    (deltas,summary) = compare_parameters(params, master_data, entry_data, categories, summary, log)
     
-    plot_deltas(params,deltas,log)
+    summary = plot_deltas(params,deltas,summary, log)
     
-    compare_times(params,entry_data,categories,log)
+    compare_times(params,entry_data,categories,summary,log)
     
     log.info( 'Analysis complete\n' )
     logging.shutdown()
@@ -110,7 +112,7 @@ def get_args():
         
     return params
 
-def check_classifications(params, master_data, entry_data, categories, log):
+def check_classifications(params, master_data, entry_data, categories, summary, log):
     """Function to check whether models have been correctly classified"""
     
     log.info('Checking model classifications')
@@ -157,6 +159,9 @@ def check_classifications(params, master_data, entry_data, categories, log):
     
     log.info('Number of classifications:')
     
+    summary.write('<br><h4>Classification</h4>\n')
+    summary.write('<table>\n')
+    
     good_classes = []
     bad_classes = []
     axticks = []
@@ -167,7 +172,10 @@ def check_classifications(params, master_data, entry_data, categories, log):
         axticks.append(i)
         axlabels.append(key)
         log.info(key+' '+str(classes[key]['n_good'])+' good, '+str(classes[key]['n_bad'])+' bad')
+        summary.write('<tr><td>'+key+'</td><td>'+str(classes[key]['n_good'])+' good</td><td>'+str(classes[key]['n_bad'])+' bad</td></tr>')
     axticks = np.array(axticks)
+    
+    summary.write('</table><br>\n')
     
     fig = plt.figure(1,(10,10))
     
@@ -209,6 +217,12 @@ def check_classifications(params, master_data, entry_data, categories, log):
     plt.savefig(path.join(params['log_dir'],'confusion_matrix.png'),bbox_inches='tight')
     
     plt.close(2)
+    
+    summary.write('<table>\n')
+    summary.write('<tr><td><img src="classifications.png"></td><td><img src="confusion_matrix.png"></td></tr>\n')
+    summary.write('<br>\n')
+    
+    return summary
     
 def list_classes(event_list):
     
@@ -264,7 +278,7 @@ def record_confusion_matrix(true_class,fitted_class,confuse_matrix,
     return confuse_matrix
     
 def compare_parameters(params, master_data, entry_data, categories,
-                       log, colour_coding=False):
+                       summary, log, colour_coding=False):
     """Function to compare the entry's fitted parameters with those from the
     master table"""
     
@@ -275,7 +289,7 @@ def compare_parameters(params, master_data, entry_data, categories,
     par_list = ['t0', 'tE', 'u0', 'rho', 'piE', \
                 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', \
                 's', 'q', 'alpha', 'dsdt', 'dadt', 'M1', 'M2', 'DL', 'DS', 'aperp']
-    fpars = start_html_file(path.join(params['log_dir'],'parameters_evaluation.html'),hdrs)
+    fpars = start_html_table(path.join(params['log_dir'],'parameters_evaluation.html'),hdrs)
 
     priority_pars = ['t0', 'tE', 'u0', 'piE', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     
@@ -349,8 +363,11 @@ def compare_parameters(params, master_data, entry_data, categories,
     fpars.write('</body>\n')
     fpars.write('</html>\n')
     fpars.close()
-
-    return deltas
+    
+    summary.write('<br><h4>Comparison of parameters with simulated values</h4>\n')
+    summary.write('<p><a href="parameters_evaluation.html">Cross-matched parameter table</a></p>\n')
+    
+    return deltas, summary
     
 def compare_parameter(true_par,fitted_par,fitted_error):
     """Function to compare a fitted numerical parameter with the true model value"""
@@ -387,12 +404,12 @@ def compare_parameter(true_par,fitted_par,fitted_error):
         
     return delta_par, within_1sig, within_3sig
 
-def plot_deltas(params,deltas,log):
+def plot_deltas(params,deltas,summary, log):
     """Function to plot distributions of the differences between the fitted 
     and true parameters"""
 
     priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
-    headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff']
+    headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff', 'N models fitted']
     
     # xmin, xmax, nbins
     plot_limits = {'t0': [-20.0, 20.0, 200],
@@ -408,48 +425,51 @@ def plot_deltas(params,deltas,log):
                 'alpha': [-5.0, 5.0, 100],
                 }
     log.info('Plotting distributions between fitted and true parameters')
-    log.info('\n Parameter mean_diff, median_diff, St.Dev min  max')
+    log.info('\n Parameter mean_diff, median_diff, St.Dev min  max N_models')
     
-    f = start_html_file(path.join(params['log_dir'],'parameter_stats_table.html'),
-                        headers)
+    summary = start_html_table(summary,headers)
     
     for par,values in deltas.items():
         
-        data = np.array(values)
+        if len(values) > 0:
+            data = np.array(values)
+            
+            median = np.median(data)
+            
+            limits = plot_limits[par]
+            
+            fig = plt.figure(1,(10,10))
+            
+            plt.subplot(1,1,1)
         
-        median = np.median(data)
-        
-        limits = plot_limits[par]
-        
-        fig = plt.figure(1,(10,10))
-        
-        plt.subplot(1,1,1)
+            (n, bins, patches) = plt.hist(data, limits[2], facecolor='g', alpha=0.75)
+            
+            plt.xlabel('$\delta '+par+'$')
+            plt.ylabel('Frequency')
+            
+            (xmin,xmax,ymin,ymax) = plt.axis()
+            plt.axis([data.min(),data.max(),ymin,ymax])
+            
+            plt.grid(True)
+            
+            plt.savefig(path.join(params['log_dir'],'delta_'+par+'_distribution.png'), bbox_inches='tight')
     
-        (n, bins, patches) = plt.hist(data, limits[2], facecolor='g', alpha=0.75)
-        
-        plt.xlabel('$\delta '+par+'$')
-        plt.ylabel('Frequency')
-        
-        (xmin,xmax,ymin,ymax) = plt.axis()
-        plt.axis([data.min(),data.max(),ymin,ymax])
-        
-        plt.grid(True)
-        
-        plt.savefig(path.join(params['log_dir'],'delta_'+par+'_distribution.png'), bbox_inches='tight')
+            plt.close(1)
+            
+            median = np.median(data)
+            
+            log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data)))
+            summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td></tr>\n')
+        else:
+            log.info(par+' No models fitted with this parameter')
+            summary.write('<tr><td>'+par+'</td><td><td colspan="6">No models fitted with this parameter</td></tr>')
+            
+    summary.write('</table>\n')
+    summary.write('<br>\n')
+    
+    return summary
 
-        plt.close(1)
-        
-        median = np.median(data)
-        
-        log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max()))
-        f.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td></tr>\n')
-        
-    f.write('</table>\n')
-    f.write('</body>\n')
-    f.write('</html>\n')
-    f.close()
-
-def compare_times(params,entry_data,categories,log):
+def compare_times(params,entry_data,categories,summary,log):
     """Function to evaluate the time taken to fit models"""
     
     log.info('Plotting distribution of time taken for fit')
@@ -513,39 +533,36 @@ def compare_times(params,entry_data,categories,log):
     else:
         log.info('Fitting times not recorded for binary models')
                                     
-def start_html_file(file_path,header):
+def start_html_table(htmlfile,header):
+    """Function to start an HTML format table file in an open file object"""
+    
+    htmlfile.write('<html>\n')
+    htmlfile.write('<body>\n')
+    htmlfile.write('<table>\n')
+    htmlfile.write('<tr>\n')
+    l = ''
+    for key in header:
+        l = l + ('<th>'+key+'</th>')
+    htmlfile.write(l+'<tr>\n')
+    
+    return htmlfile
+
+def start_html_file(file_path,title=None):
     """Function to start an HTML format table file"""
     
     f = open(file_path,'w')
     f.write('<html>\n')
     f.write('<body>\n')
-    f.write('<table>\n')
-    f.write('<tr>\n')
-    l = ''
-    for key in header:
-        l = l + ('<th>'+key+'</th>')
-    f.write(l+'<tr>\n')
-    
-    return f
-    
-def start_tex_file(file_path):
-    """Function to start a latex format table file"""
-    
-    f = open(file_path,'w')
-    f.write('\\documentclass[11pt]{article}\n')
-    f.write('\\usepackage{amsmath,amssymb}\n')
-    f.write('\\usepackage{xcolor,colortbl}\n')
-    f.write('\\usepackage{float}\n')
-    f.write('\\begin{document}\n')
-    
-    f.write('\\begin{table}\n')
-    f.write('\\centering\n')
-    f.write('\\begin{tabular}{llllllll}\n')
-    f.write('\\hline\n')
-    
-    return f
+    if title != None:
+        f.write('<h2>'+title+'</h2>\n')
+   
+   return f
    
 if __name__ == '__main__':
     
-    evaluate_entry()
-    
+    if len(argv) > 1:
+        teamID = argv[1]
+        evaluate_entry(teamID=teamID)
+    else:
+        evaluate_entry()
+        
