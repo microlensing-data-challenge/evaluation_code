@@ -12,7 +12,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
-def evaluate_entry(teamID=None):
+def evaluate_entry():
     """Function to evaluate the numerical data from a data challenge entry, 
     by comparing the fitted numerical parameters with the master table data"""
     
@@ -26,7 +26,9 @@ def evaluate_entry(teamID=None):
     
     log = start_log( params['log_file'] )
     
-    summary = start_html_file(file_path,title=teamID)
+    summary_path = path.join(params['log_dir'],'entry_summary.html')
+    
+    summary = start_html_file(summary_path,title=params['teamID'])
     
     master_data = parse_table1.read_master_table(params['master_file'])
     
@@ -38,10 +40,14 @@ def evaluate_entry(teamID=None):
     
     summary = plot_deltas(params,deltas,summary, log)
     
-    compare_times(params,entry_data,categories,summary,log)
+    summary = compare_times(params,entry_data,categories,summary,log)
     
     log.info( 'Analysis complete\n' )
     logging.shutdown()
+    
+    summary.write('</body>\n')
+    summary.write('</html>\n')
+    summary.close()
     
 def start_log(log_file):
     """Function to initialize a log file
@@ -101,11 +107,13 @@ def get_args():
         
         params['master_file'] = input('Please enter the path to the master parameter file: ')
         params['entry_file'] = input('Please enter the path to the entry data file: ')
+        params['teamID'] = input('Please enter the path to the entry data file: ')
         
     else:
         
         params['master_file'] = argv[1]
         params['entry_file'] = argv[2]
+        params['teamID'] = argv[3]
     
     params['log_dir'] = path.dirname(params['entry_file'])
     params['log_file'] = path.join(params['log_dir'], 'evaluation.log')
@@ -159,7 +167,8 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     
     log.info('Number of classifications:')
     
-    summary.write('<br><h4>Classification</h4>\n')
+    summary.write('<br><h2>Classification</h2>\n')
+    summary.write('<p>Note that these totals include the classifications from all fitted models.  If more than one fitted model was provided for a simulated event, they may exceed the total number of events.\n')
     summary.write('<table>\n')
     
     good_classes = []
@@ -219,8 +228,8 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     plt.close(2)
     
     summary.write('<table>\n')
-    summary.write('<tr><td><img src="classifications.png"></td><td><img src="confusion_matrix.png"></td></tr>\n')
-    summary.write('<br>\n')
+    summary.write('<tr><td><img src="classifications.png" width="100%"></td><td><img src="confusion_matrix.png"  width="100%"></td></tr>\n')
+    summary.write('</table><br>\n')
     
     return summary
     
@@ -289,7 +298,15 @@ def compare_parameters(params, master_data, entry_data, categories,
     par_list = ['t0', 'tE', 'u0', 'rho', 'piE', \
                 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', \
                 's', 'q', 'alpha', 'dsdt', 'dadt', 'M1', 'M2', 'DL', 'DS', 'aperp']
-    fpars = start_html_table(path.join(params['log_dir'],'parameters_evaluation.html'),hdrs)
+    fpars = start_html_file(path.join(params['log_dir'],'parameters_evaluation.html'))
+    fpars.write('<center><h1>Comparison of fitted parameters for '+params['teamID']+'</h1></center>\n')
+    fpars.write('<br>\n')
+    fpars.write('<p>The table below compares the parameters obtained during the fitting process (black) with the true parameters used to simulate the datasets (grey, italics)</p>\n')
+    fpars.write('<p>If a team provided several alternative models for a single dataset, these are represented by multiple entries with the same ModelID</p>\n')
+    fpars.write("<p>'None' entries represent values missing from the team's table entry data.</p>\n")
+    fpars.write('<p><a href="entry_summary.html">Back to entry summary</a>\n')
+    
+    fpars = start_html_table(fpars,hdrs)
 
     priority_pars = ['t0', 'tE', 'u0', 'piE', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     
@@ -364,7 +381,7 @@ def compare_parameters(params, master_data, entry_data, categories,
     fpars.write('</html>\n')
     fpars.close()
     
-    summary.write('<br><h4>Comparison of parameters with simulated values</h4>\n')
+    summary.write('<br><h2>Comparison of parameters with simulated values</h2>\n')
     summary.write('<p><a href="parameters_evaluation.html">Cross-matched parameter table</a></p>\n')
     
     return deltas, summary
@@ -427,6 +444,9 @@ def plot_deltas(params,deltas,summary, log):
     log.info('Plotting distributions between fitted and true parameters')
     log.info('\n Parameter mean_diff, median_diff, St.Dev min  max N_models')
     
+    summary.write('<p><h2>Distributions of fitted parameters from true values</h2>\n')
+    summary.write('<p>The table and plots below provide basic statistics on the distributions of fitted parameter values relative to the true simulated data</p>\n')
+
     summary = start_html_table(summary,headers)
     
     for par,values in deltas.items():
@@ -444,14 +464,18 @@ def plot_deltas(params,deltas,summary, log):
         
             (n, bins, patches) = plt.hist(data, limits[2], facecolor='g', alpha=0.75)
             
-            plt.xlabel('$\delta '+par+'$')
-            plt.ylabel('Frequency')
+            plt.title('Distribution in $\delta '+par+'$', fontsize=18)
+            plt.xlabel('$\delta '+par+'$', fontsize=18)
+            plt.ylabel('Frequency', fontsize=18)
             
             (xmin,xmax,ymin,ymax) = plt.axis()
             plt.axis([data.min(),data.max(),ymin,ymax])
             
             plt.grid(True)
             
+            plt.tick_params(axis='x', labelsize=18)
+            plt.tick_params(axis='y', labelsize=18)
+    
             plt.savefig(path.join(params['log_dir'],'delta_'+par+'_distribution.png'), bbox_inches='tight')
     
             plt.close(1)
@@ -464,6 +488,14 @@ def plot_deltas(params,deltas,summary, log):
             log.info(par+' No models fitted with this parameter')
             summary.write('<tr><td>'+par+'</td><td><td colspan="6">No models fitted with this parameter</td></tr>')
             
+    summary.write('</table>\n')
+    summary.write('<br>\n')
+    
+    summary.write('<table>\n')
+    summary.write('<tr><td><img src="delta_t0_distribution.png" width="100%"></td><td><img src="delta_tE_distribution.png" width="100%"></td></tr>\n')
+    summary.write('<tr><td><img src="delta_u0_distribution.png" width="100%"></td><td><img src="delta_alpha_distribution.png" width="100%"></td></tr>\n')
+    summary.write('<tr><td><img src="delta_fs_W_distribution.png" width="100%"></td><td><img src="delta_fb_W_distribution.png" width="100%"></td></tr>\n')
+    summary.write('<tr><td><img src="delta_s_distribution.png" width="100%"></td><td><img src="delta_q_distribution.png" width="100%"></td></tr>\n')
     summary.write('</table>\n')
     summary.write('<br>\n')
     
@@ -518,21 +550,34 @@ def compare_times(params,entry_data,categories,summary,log):
     plt.savefig(path.join(params['log_dir'],'time_to_fit_distribution.png'), bbox_inches='tight')
 
     plt.close(1)
+
+    summary.write('<br><h2>Time to compute fits</h2>\n')
+    summary.write('<br>\n')    
     
     if len(ts_pspl) > 0:
         median_pspl = np.median(ts_pspl)
-        log.info('Median time taken for PSPL fit '+str(median_pspl)+\
-                                    ' std.dev. '+str(ts_pspl.std()))
+        log.info('Median time taken for PSPL fit = '+str(median_pspl)+\
+                                    ' std.dev. = '+str(ts_pspl.std()))
+        summary.write('Median time taken for PSPL fit = '+str(median_pspl)+\
+                                    ' std.dev. = '+str(ts_pspl.std())+'\n')
     else:
         log.info('Fitting times not recorded for PSPL models')
+        summary.write('Fitting times not recorded for PSPL models\n')
         
     if len(ts_binary) > 0:
         median_binary = np.median(ts_binary)
-        log.info('Median time taken for binary fit '+str(median_binary)+\
-                                    ' std.dev. '+str(ts_binary.std()))
+        log.info('Median time taken for binary fit = '+str(median_binary)+\
+                                    ' std.dev. = '+str(ts_binary.std()))
+        summary.write('Median time taken for binary fit = '+str(median_binary)+\
+                                    ' std.dev. = '+str(ts_binary.std())+'\n')
     else:
         log.info('Fitting times not recorded for binary models')
-                                    
+        summary.write('Fitting times not recorded for binary models\n')
+    
+    summary.write('<img src="time_to_fit_distribution.png" width="100%">\n')
+    
+    return summary
+    
 def start_html_table(htmlfile,header):
     """Function to start an HTML format table file in an open file object"""
     
@@ -554,15 +599,11 @@ def start_html_file(file_path,title=None):
     f.write('<html>\n')
     f.write('<body>\n')
     if title != None:
-        f.write('<h2>'+title+'</h2>\n')
+        f.write('<center><h1>'+title+'</h1></center>\n')
    
-   return f
+    return f
    
 if __name__ == '__main__':
     
-    if len(argv) > 1:
-        teamID = argv[1]
-        evaluate_entry(teamID=teamID)
-    else:
-        evaluate_entry()
+    evaluate_entry()
         

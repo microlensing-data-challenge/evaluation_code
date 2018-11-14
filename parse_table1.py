@@ -279,8 +279,6 @@ def read_standard_ascii_DC_table(file_path,page=False):
         elif len(line.replace('\n','')) > 0:
             
             modelID = items[0]
-            if modelID.replace('ulwdc','')[0:1] != '_':
-                modelID = 'ulwdc1_'+modelID.replace('ulwdc','')
             if len(str(modelID).split('_')) > 2:
                 modelID = '_'.join(str(modelID).split('_')[0:2])
             
