@@ -324,11 +324,25 @@ def read_standard_ascii_DC_table(file_path,page=False):
             if entry.t0 != None and entry.t0 < 2450000.0:
                 entry.t0 = entry.t0 + 2450000.0
             
+            # Catch for entries which included only a single passband of fs, fb
+            # -> Assigned to W149 filter
+            if 'fs' in dir(entry) and entry.fs_W == None and entry.fs_Z == None:
+                entry.fs_W = entry.fs
+                
+            if 'sig_fs' in dir(entry) and entry.sig_fs_W == None and entry.sig_fs_Z == None:
+                entry.sig_fs_W = entry.sig_fs
+                
+            if 'fb' in dir(entry) and entry.fb_W == None and entry.fb_Z == None:
+                entry.fb_W = entry.fb
+                
+            if 'sig_fb' in dir(entry) and entry.sig_fb_W == None and entry.sig_fb_Z == None:
+                entry.sig_fb_W = entry.sig_fb
+                
             if entry.modelID in model_data.keys():
                 model_data[entry.modelID].append(entry)
             else:
                 model_data[entry.modelID] = [entry]
-                
+            
             #if len(values) == 39:
                 
             #    model_data[entry.modelID] = entry
