@@ -34,9 +34,11 @@ def evaluate_entry():
     
     entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'])
     
-    summary = check_classifications(params, master_data, entry_data, categories, summary, log)
+    summary = check_classifications(params, master_data, entry_data, 
+                                    categories, summary, log)
     
-    (deltas,summary) = compare_parameters(params, master_data, entry_data, categories, summary, log)
+    (deltas,summary) = compare_parameters(params, master_data, entry_data, 
+                                    categories, summary, log)
     
     summary = plot_deltas(params,deltas,summary, log)
     
@@ -310,10 +312,14 @@ def compare_parameters(params, master_data, entry_data, categories,
 
     priority_pars = ['t0', 'tE', 'u0', 'piE', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     
-    deltas = { }
-    for key in priority_pars:
-        deltas[key] = []
-        
+    deltas = { 'PSPL_true': {}, 'PSPL_false': {},
+               'Binary_star_true': {}, 'Binary_star_false': {},
+               'Binary_planet_true': {}, 'Binary_planet_false': {},
+              }
+    for group in deltas.keys():
+        for key in priority_pars:
+            deltas[group][key] = []
+    
     log.info('Comparing parameter fitted values with those simulated')
     
     for modelID, model in master_data.items():
@@ -329,13 +335,16 @@ def compare_parameters(params, master_data, entry_data, categories,
                     
                     line = '<tr><td>'+str(modelID)+'</td>'
                     
-                    if compare_class(true_class,m.model_class,categories):
+                    accurate_class = compare_class(true_class,m.model_class,categories)
+                    group = get_model_group(true_class,accurate_class)
+                    
+                    if accurate_class:
                         line = line + '<td>'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
-                    elif compare_class(true_class,m.model_class,categories) == False and colour_coding:
+                    elif accurate_class == False and colour_coding:
                         line = line + '<td bgcolor="#F08080">'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
                     else:
                         line = line + '<td>'+m.model_class+'<br><font color="#515A5A"><i>'+model.model_class+'</i></font></td>'
-                        
+                    
                     for par in par_list:
                         par_true = getattr(model,par)
                         par_fit = getattr(m,par)
@@ -363,8 +372,8 @@ def compare_parameters(params, master_data, entry_data, categories,
                                         '<br><font color="#515A5A"><i>'+ str(par_true)+'</i></font></td>'
                                         
                         if dpar != None and par in priority_pars:
-                            deltas[par].append(dpar)
-                            
+                            deltas[group][par].append(dpar)
+                                
                     line = line + ' <td> '+str(m.chisq_W)+' </td></tr>\n'
                     
                     fpars.write(line)
@@ -385,6 +394,15 @@ def compare_parameters(params, master_data, entry_data, categories,
     summary.write('<p><a href="parameters_evaluation.html">Cross-matched parameter table</a></p>\n')
     
     return deltas, summary
+
+def get_model_group(true_class,accurate_class):
+    
+    if accurate_class:
+        group = true_class+'_true'
+    else:
+        group = true_class+'_false'
+    
+    return group
     
 def compare_parameter(true_par,fitted_par,fitted_error):
     """Function to compare a fitted numerical parameter with the true model value"""
@@ -429,78 +447,144 @@ def plot_deltas(params,deltas,summary, log):
     headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff', 'N models fitted']
     
     # xmin, xmax, nbins
-    plot_limits = {'t0': [-20.0, 20.0, 200],
-                'tE': [-20.0, 20.0, 200],
-                'u0': [-2.0, 2.0, 200],
-                'piE': [-5.0, 5.0, 200],
+    plot_limits = {'t0': [-20.0, 20.0, 100],
+                'tE': [-20.0, 20.0, 100],
+                'u0': [-2.0, 2.0, 100],
+                'piE': [-5.0, 5.0, 100],
                 'fs_W': [-1e4, 1e4, 200],
                 'fb_W': [-1e4, 1e4, 200],
                 'fs_Z': [-1e4, 1e4, 200],
                 'fb_Z': [-1e4, 1e4, 200],
-                's': [-5.0, 5.0, 200],
-                'q': [-5.0, 5.0, 200],
+                's': [-5.0, 5.0, 100],
+                'q': [-5.0, 5.0, 100],
                 'alpha': [-5.0, 5.0, 100],
                 }
+    group_colours = {'PSPL_true': '#05C709', 'PSPL_false': '#026604', 
+                     'Binary_star_true': '#5D5FFD', 'Binary_star_false': '#020499',
+                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'}
+                     
     log.info('Plotting distributions between fitted and true parameters')
     log.info('\n Parameter mean_diff, median_diff, St.Dev min  max N_models')
     
     summary.write('<p><h2>Distributions of fitted parameters from true values</h2>\n')
-    summary.write('<p>The table and plots below provide basic statistics on the distributions of fitted parameter values relative to the true simulated data</p>\n')
+    summary.write('<p>The tables and plots below provide basic statistics on the distributions of fitted parameter values relative to the true simulated data, with separate analysis performed for correctly and incorrectly classified models.</p>\n')
+    summary.write('<p>Please note that parameter values are frequently not provided for models which were missclassified.  No comparison can be made in these cases.</p>\n')
+    
+    for group in deltas.keys():
+        summary.write('<p><b>'+group.replace('_',' ')+'</b><tr>\n')
+        log.info(group)
+        summary = start_html_table(summary,headers)
+        
+        for par,values in deltas[group].items():
+            
+            if len(values) > 0:
+                data = np.array(values)
+            
+                median = np.median(data)
+                
+                log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data)))
 
-    summary = start_html_table(summary,headers)
+                summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td></tr>\n')
+            
+            else:
+                log.info(par+' No models fitted with this parameter')
+                
+                summary.write('<tr><td>'+par+'</td><td><td colspan="6">No models fitted with this parameter</td></tr>')
+            
+        summary.write('</table>\n')
+        summary.write('</p><br>\n')
     
-    for par,values in deltas.items():
+    plt_dict = {'PSPL': {}, 'Binary_star': {}, 'Binary_planet': {}}
+    
+    for par in deltas['Binary_star_true'].keys():
         
-        if len(values) > 0:
-            data = np.array(values)
-            
-            median = np.median(data)
-            
-            limits = plot_limits[par]
-            
-            fig = plt.figure(1,(10,10))
-            
-            plt.subplot(1,1,1)
+        limits = plot_limits[par]
         
-            (n, bins, patches) = plt.hist(data, limits[2], facecolor='g', alpha=0.75)
+        for group in plt_dict.keys():
             
-            plt.title('Distribution in $\delta '+par+'$', fontsize=18)
-            plt.xlabel('$\delta '+par+'$', fontsize=18)
-            plt.ylabel('Frequency', fontsize=18)
+            values_true = deltas[group+'_true'][par]
+            values_false = deltas[group+'_false'][par]
             
-            (xmin,xmax,ymin,ymax) = plt.axis()
-            plt.axis([data.min(),data.max(),ymin,ymax])
+            if len(values_true) > 0 or len(values_false) > 0:
+                
+                fig = plt.figure(1,(10,10))
+                
+                plt.subplot(1,1,1)
             
-            plt.grid(True)
+                data_true = np.array(values_true)
+                data_false = np.array(values_false)
+                
+                (n, bins, patches) = plt.hist(data_true, limits[2], 
+                                                 facecolor='#026604', 
+                                                  alpha=0.75,label='Classified')
+                                                  
+                (n, bins, patches) = plt.hist(data_false, bins, 
+                                                  facecolor='#7F0299', 
+                                                  alpha=0.75,label='Missclassified')
+                
+                plt.title('Distribution in $\delta '+par+'$', fontsize=18)
+                plt.xlabel('$\delta '+par+'$', fontsize=18)
+                plt.ylabel('Frequency', fontsize=18)
+                
+                (xmin,xmax,ymin,ymax) = plt.axis()
+                (xmin,xmax) = get_xlimits(data_true,data_false)
+                plt.axis([xmin,xmax,ymin,ymax])
+                #plt.axis([limits[0],limits[1],ymin,ymax])
+                
+                plt.grid(True)
+                plt.legend()
+                
+                plt.tick_params(axis='x', labelsize=18)
+                plt.tick_params(axis='y', labelsize=18)
+        
+                plt.savefig(path.join(params['log_dir'],'delta_'+group+'_'+par+'_distribution.png'), bbox_inches='tight')
+        
+                plt.close(1)
             
-            plt.tick_params(axis='x', labelsize=18)
-            plt.tick_params(axis='y', labelsize=18)
+                plt_dict[group][par] = True
+                
+            else:
+                plt_dict[group][par] = False
     
-            plt.savefig(path.join(params['log_dir'],'delta_'+par+'_distribution.png'), bbox_inches='tight')
+    summary.write('<table>\n<tr>')
+    header = '<tr><th><strong>Parameter</strong></th>'
+    for k in plt_dict.keys():
+        header += '<th>'+k+'</th>'
+    header += '</tr>'
+    summary.write(header+'\n')
     
-            plt.close(1)
+    for par in deltas['Binary_star_true'].keys():
+        
+        summary.write('<tr><td><strong>'+par+'</strong></td>')
+
+        for group in ['PSPL', 'Binary_star', 'Binary_planet']:
             
-            median = np.median(data)
-            
-            log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data)))
-            summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td></tr>\n')
-        else:
-            log.info(par+' No models fitted with this parameter')
-            summary.write('<tr><td>'+par+'</td><td><td colspan="6">No models fitted with this parameter</td></tr>')
-            
-    summary.write('</table>\n')
-    summary.write('<br>\n')
-    
-    summary.write('<table>\n')
-    summary.write('<tr><td><img src="delta_t0_distribution.png" width="100%"></td><td><img src="delta_tE_distribution.png" width="100%"></td></tr>\n')
-    summary.write('<tr><td><img src="delta_u0_distribution.png" width="100%"></td><td><img src="delta_alpha_distribution.png" width="100%"></td></tr>\n')
-    summary.write('<tr><td><img src="delta_fs_W_distribution.png" width="100%"></td><td><img src="delta_fb_W_distribution.png" width="100%"></td></tr>\n')
-    summary.write('<tr><td><img src="delta_s_distribution.png" width="100%"></td><td><img src="delta_q_distribution.png" width="100%"></td></tr>\n')
+            if plt_dict[group][par]:
+                summary.write('<td><img src="delta_'+group+'_'+par+'_distribution.png" width="100%"></td>')
+            else:
+                summary.write('<td>No data</td>')
+        summary.write('</tr>\n')
     summary.write('</table>\n')
     summary.write('<br>\n')
     
     return summary
 
+def get_xlimits(data_true,data_false):
+    
+    if len(data_true) > 0 and len(data_false) > 0:
+        xmin = min(data_true.min(), data_false.min())
+        xmax = max(data_true.max(), data_false.max())
+        
+    elif len(data_true) > 0 and len(data_false) == 0:
+        xmin = data_true.min()
+        xmax = data_true.max()
+        
+    elif len(data_true) == 0 and len(data_false) > 0:
+        xmin = data_false.min()
+        xmax = data_false.max()
+    
+    return xmin, xmax
+    
 def compare_times(params,entry_data,categories,summary,log):
     """Function to evaluate the time taken to fit models"""
     

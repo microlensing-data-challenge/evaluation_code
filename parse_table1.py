@@ -20,6 +20,7 @@ class EventEntry():
         self.idx = None
         self.modelID = None
         self.model_class = None
+        self.true_class = None
         self.t0 = None
         self.sig_t0 = None
         self.tE = None
