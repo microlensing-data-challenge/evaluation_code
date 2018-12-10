@@ -319,6 +319,7 @@ def compare_parameters(params, master_data, entry_data, categories,
     for group in deltas.keys():
         for key in priority_pars:
             deltas[group][key] = []
+            deltas[group][key+'_mean_sq_err'] = []
     
     log.info('Comparing parameter fitted values with those simulated')
     
@@ -350,7 +351,7 @@ def compare_parameters(params, master_data, entry_data, categories,
                         par_fit = getattr(m,par)
                         par_error = getattr(m,'sig_'+par)
                         
-                        (dpar,within_1sig,within_3sig) = compare_parameter(par_true,par_fit,par_error)
+                        (dpar,within_1sig,within_3sig,mean_sq_err) = compare_parameter(par_true,par_fit,par_error)
                         
                         #if par == 't0':   
                          #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
@@ -373,7 +374,9 @@ def compare_parameters(params, master_data, entry_data, categories,
                                         
                         if dpar != None and par in priority_pars:
                             deltas[group][par].append(dpar)
-                                
+                        if mean_sq_err != None and par in priority_pars:
+                            deltas[group][par+'_mean_sq_err'].append(mean_sq_err)
+                            
                     line = line + ' <td> '+str(m.chisq_W)+' </td></tr>\n'
                     
                     fpars.write(line)
@@ -409,18 +412,22 @@ def compare_parameter(true_par,fitted_par,fitted_error):
     
     within_1sig = False
     within_3sig = False
+    mean_sq_err = None
     
     if fitted_par == None and true_par == None:
         
         delta_par = None
         within_1sig = True
         within_3sig = True
-    
+        mean_sq_err = None
+        
     elif fitted_par != None and true_par != None:
         
         delta_par = true_par - fitted_par
         
         if fitted_error != None:
+            
+            mean_sq_err = (fitted_par - true_par)**2 + (fitted_error*fitted_error)
             
             if abs(delta_par) <= fitted_error:
                 within_1sig = True
@@ -437,14 +444,14 @@ def compare_parameter(true_par,fitted_par,fitted_error):
         
         delta_par = None
         
-    return delta_par, within_1sig, within_3sig
+    return delta_par, within_1sig, within_3sig, mean_sq_err
 
 def plot_deltas(params,deltas,summary, log):
     """Function to plot distributions of the differences between the fitted 
     and true parameters"""
 
     priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
-    headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff', 'N models fitted']
+    headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff', 'N models fitted', 'Avg mean sq error']
     
     # xmin, xmax, nbins
     plot_limits = {'t0': [-20.0, 20.0, 100],
@@ -475,28 +482,36 @@ def plot_deltas(params,deltas,summary, log):
         log.info(group)
         summary = start_html_table(summary,headers)
         
-        for par,values in deltas[group].items():
+        for par in priority_pars:
+            
+            values = deltas[group][par]
+            mean_sq_values = deltas[group][par+'_mean_sq_err']
             
             if len(values) > 0:
                 data = np.array(values)
+                mean_sq_data = np.array(mean_sq_values)
             
                 median = np.median(data)
                 
-                log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data)))
-
-                summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td></tr>\n')
+                if len(mean_sq_values) > 0:
+                    log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data))+' '+repr(mean_sq_data.mean()))
+                    summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td><td>'+str(mean_sq_data.mean())+'</td></tr>\n')
+            
+                else:
+                    log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data))+' None')
+                    summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td><td>None</td></tr>\n')
             
             else:
                 log.info(par+' No models fitted with this parameter')
                 
-                summary.write('<tr><td>'+par+'</td><td><td colspan="6">No models fitted with this parameter</td></tr>')
+                summary.write('<tr><td>'+par+'</td><td><td colspan="7">No models fitted with this parameter</td></tr>')
             
         summary.write('</table>\n')
         summary.write('</p><br>\n')
     
     plt_dict = {'PSPL': {}, 'Binary_star': {}, 'Binary_planet': {}}
     
-    for par in deltas['Binary_star_true'].keys():
+    for par in priority_pars:
         
         limits = plot_limits[par]
         
@@ -553,7 +568,7 @@ def plot_deltas(params,deltas,summary, log):
     header += '</tr>'
     summary.write(header+'\n')
     
-    for par in deltas['Binary_star_true'].keys():
+    for par in priority_pars:
         
         summary.write('<tr><td><strong>'+par+'</strong></td>')
 
