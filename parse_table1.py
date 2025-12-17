@@ -8,7 +8,6 @@ Created on Thu Jun 28 15:30:07 2018
 from os import path
 from sys import argv
 import numpy as np
-import copy
 
 class EventEntry():
     """Class describing the attributes of the parameters for a given event 
