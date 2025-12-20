@@ -1,4 +1,3 @@
-from os import path
 import argparse
 from parse_table1 import EventEntry
 from bs4 import BeautifulSoup
@@ -19,7 +18,7 @@ def load_parameter_evaluation_table(file_path):
 
     # Load the HTML file
     with open(file_path) as f:
-        soup = BeautifulSoup(f)
+        soup = BeautifulSoup(f, features="html.parser")
 
     # Find the tags for the table header and create a list of the header items
     # Parse two column headers that where the headers are not the same as the
@@ -44,7 +43,10 @@ def load_parameter_evaluation_table(file_path):
 
         for i,heading in enumerate(hdr):
             # Some entries have both the value and uncertainty in the same string,
-            # so split these
+            # so split these.  Note some cells also have a second line, separated by a <br>
+            # with the true parameter value in italics.  Inspection indicates that BeautifulSoup
+            # behaves a little strangely with these, looping over the same line several times
+            # but only ever taking the first row of the cell.  So the following code works.
             values = entries[i].split()
             if len(values) > 1:
                 data[heading] = parse_value(values[0])
@@ -63,10 +65,15 @@ def parse_value(value):
     unchanged
     """
 
-    if 'none' in str(value).lower() or not str(value).isdigit():
-        return value
+    if 'none' in str(value).lower():
+        result = value
     else:
-        return float(value)
+        try:
+            result = float(value)
+        except ValueError:
+            result = value
+
+    return result
 
 def get_args():
     parser = argparse.ArgumentParser()

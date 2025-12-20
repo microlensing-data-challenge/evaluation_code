@@ -204,7 +204,11 @@ class EventEntry():
             output += ' '+key+'='+repr(getattr(self,key))
             
         return output
-    
+
+    def summarize_parameters(self):
+        output = ' '.join([str(getattr(self, par[0])) for par in self.requirements])
+        return output
+
 def read_standard_ascii_DC_table(file_path,page=False):
     """Function to read a Data Challenge entry table in standard ASCII format
     
