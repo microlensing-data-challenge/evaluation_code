@@ -725,35 +725,40 @@ def compare_times(params,entry_data,categories,summary,log):
     
     ts_pspl = np.array(ts_pspl)
     ts_binary = np.array(ts_binary)
-    
-    fig = plt.figure(1,(20,10))
-        
-    plt.subplot(1,2,1)
+
+    # Compute basic statistics
+    print('Time taken for PSPL fits: median ' + str(np.median(ts_pspl)) + ' std.dev ' + str(ts_pspl.std()))
+    print('Time taken for binary fits: median ' + str(np.median(ts_binary)) + ' std.dev ' + str(ts_binary.std()))
+    print('Number of PSPL fits with measured times: ' + str(len(ts_pspl)))
+    print('Number of binary fits with measured times: ' + str(len(ts_binary)))
+
+    fig, axs = plt.subplots(1,2, figsize=(20,10))
     
     if len(ts_pspl) > 0:
-        (n, bins, patches) = plt.hist(ts_pspl, 50, facecolor='g', alpha=0.75,
+        (n, bins, patches) = axs[0].hist(ts_pspl, 50, facecolor='g', alpha=0.75,
                                 label='PSPL fits')
         
-    plt.title('PSPL fits')
-    plt.xlabel('Time to fit [hrs]')
-    plt.ylabel('Frequency')
-    plt.grid(True)
+    axs[0].set_title('PSPL fits', fontsize=18)
+    axs[0].set_xlabel('Time to fit [hrs]', fontsize=18)
+    axs[0].set_ylabel('Frequency', fontsize=18)
+    axs[0].tick_params(axis='both', which='major', labelsize=16)
+    axs[0].grid(True)
     
     if len(ts_binary) > 0:
-        plt.subplot(1,2,2)
-        
+
         if len(ts_binary) > 0:
-            (n, bins, patches) = plt.hist(ts_binary, 50, facecolor='m', alpha=0.75,
+            (n, bins, patches) = axs[1].hist(ts_binary, 50, facecolor='m', alpha=0.75,
                                     label='Binary fits')
         
-        plt.title('Binary fits')
-        plt.xlabel('Time to fit [hrs]')
-        plt.ylabel('Frequency')
-        plt.grid(True)
+        axs[1].set_title('Binary fits', fontsize=18)
+        axs[1].set_xlabel('Time to fit [hrs]', fontsize=18)
+        axs[1].set_ylabel('Frequency', fontsize=18)
+        axs[1].grid(True)
+        axs[1].tick_params(axis='both', which='major', labelsize=16)
     
     plt.savefig(path.join(params['log_dir'],'time_to_fit_distribution.png'), bbox_inches='tight')
 
-    plt.close(1)
+    plt.close(fig)
 
     summary.write('<br><h2>Time to compute fits</h2>\n')
     summary.write('<br>\n')    
