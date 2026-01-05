@@ -187,43 +187,44 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     axticks = np.array(axticks)
     
     summary.write('</table><br>\n')
-    
-    fig = plt.figure(1,(10,10))
-    
-    bwidth = 0.4
-    plt.subplot(1,1,1)
 
-    p1 = plt.bar(axticks-bwidth/2.0, good_classes, 
+    bwidth = 0.4
+    fig, ax = plt.subplots(1,1, figsize=(10,10))
+
+    p1 = ax.bar(axticks-bwidth/2.0, good_classes,
                          bwidth, color='r', label='Accurately classified')
 
-    p2 = plt.bar(axticks+bwidth/2.0, bad_classes, 
+    p2 = ax.bar(axticks+bwidth/2.0, bad_classes,
                          bwidth, color='k', label='Misclassified')
     
-    plt.xlabel('Model type')
-    plt.ylabel('Number classified')
+    ax.set_xlabel('Model type', fontsize=18)
+    ax.set_ylabel('Number classified', fontsize=18)
     
-    plt.xticks(axticks, axlabels)
-    
-    plt.grid(True)
-    plt.legend()
+    ax.set_xticks(axticks, axlabels, fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=16)
+
+    ax.grid(True)
+    ax.legend(fontsize=16)
     
     plt.savefig(path.join(params['log_dir'],'classifications.png'),bbox_inches='tight')
     
-    plt.close(1)
+    plt.close(fig)
 
     fig = plt.figure(2,(10,10))
     
     plt.imshow(confuse_matrix, interpolation='nearest', cmap=plt.cm.Blues)
     
-    plt.colorbar()
-    
-    xtick_marks = np.arange(len(fitted_classes))
-    plt.xticks(xtick_marks, fitted_classes, rotation=45)
-    ytick_marks = np.arange(len(true_classes))
-    plt.yticks(ytick_marks, true_classes)
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=16)
+    cbar.set_label('Number of stars', fontsize=16)
 
-    plt.ylabel('True class')
-    plt.xlabel('Fitted class')
+    xtick_marks = np.arange(len(fitted_classes))
+    plt.xticks(xtick_marks, fitted_classes, rotation=45, fontsize=16)
+    ytick_marks = np.arange(len(true_classes))
+    plt.yticks(ytick_marks, true_classes, fontsize=16)
+
+    plt.ylabel('True class', fontsize=18)
+    plt.xlabel('Fitted class', fontsize=18)
     
     plt.savefig(path.join(params['log_dir'],'confusion_matrix.png'),bbox_inches='tight')
     
@@ -466,7 +467,8 @@ def plot_deltas(params,deltas,summary, log):
                 'q': [-5.0, 5.0, 100],
                 'alpha': [-5.0, 5.0, 100],
                 }
-    group_colours = {'PSPL_true': '#05C709', 'PSPL_false': '#026604', 
+
+    group_colours = {'PSPL_true': '#05C709', 'PSPL_false': '#026604',
                      'Binary_star_true': '#5D5FFD', 'Binary_star_false': '#020499',
                      'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'}
                      
@@ -514,7 +516,7 @@ def plot_deltas(params,deltas,summary, log):
     for par in priority_pars:
         
         limits = plot_limits[par]
-        
+
         for group in plt_dict.keys():
             
             values_true = deltas[group+'_true'][par]
@@ -581,7 +583,110 @@ def plot_deltas(params,deltas,summary, log):
         summary.write('</tr>\n')
     summary.write('</table>\n')
     summary.write('<br>\n')
-    
+
+    # Re-adding summary plots for paper
+    # PSPL parameters for all event types
+    ncol = 2
+    nrow = 2
+    fig, axs = plt.subplots(nrow, ncol, figsize=(10, 10))
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.3, hspace=0.3)
+
+    ix = 0
+    iy = 0
+    for par in ['t0', 'tE', 'u0', 'piE']:
+        limits = plot_limits[par]
+
+        bins = np.arange(limits[0], limits[1], (limits[1]-limits[0])/limits[2])
+
+        for group in plt_dict.keys():
+
+            values_true = deltas[group + '_true'][par]
+            values_false = deltas[group + '_false'][par]
+
+            if len(values_true) > 0 or len(values_false) > 0:
+
+                data_true = np.array(values_true)
+                data_false = np.array(values_false)
+
+                (n, bins, patches) = axs[ix,iy].hist(data_true, bins,
+                                              facecolor=group_colours[group + '_true'],
+                                              alpha=0.75, label=group)
+
+                #(n, bins, patches) = axs[ix,iy].hist(data_false, bins,
+                #                              facecolor=group_colours[group + '_false'],
+                #                              alpha=0.75, label=group + ' misclassified')
+
+                #axs[ix,iy].set_title('Distribution in $\delta ' + par + '$', fontsize=18)
+                axs[ix,iy].set_xlabel('$\delta ' + par + '$', fontsize=18)
+                axs[ix,iy].set_ylabel('Frequency', fontsize=18)
+
+                axs[ix,iy].set_xlim(limits[0], limits[1])
+
+                axs[ix,iy].grid(True)
+                if ix == 0 and iy == 0:
+                    axs[ix,iy].legend(ncol = 3, bbox_to_anchor=(0.2, -1.75, 2.0, 2.0), fontsize=16)
+
+                axs[ix,iy].tick_params(axis='both', which='major', labelsize=18)
+
+        ix += 1
+        if ix == ncol:
+            ix = 0
+            iy += 1
+
+    plt.savefig(path.join(params['log_dir'], 'delta_pspl_param_distributions.png'),
+                            bbox_inches='tight')
+
+    plt.close(fig)
+
+    # Binary lens parameters for all event types
+    ncol = 3
+    nrow = 1
+    fig, axs = plt.subplots(nrow, ncol, figsize=(20, 10))
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.3, hspace=0.3)
+
+    ix = 0
+    for par in ['s', 'q', 'alpha']:
+        limits = plot_limits[par]
+
+        bins = np.arange(limits[0], limits[1], (limits[1]-limits[0])/limits[2])
+
+        for group in plt_dict.keys():
+
+            values_true = deltas[group + '_true'][par]
+            values_false = deltas[group + '_false'][par]
+
+            if len(values_true) > 0 or len(values_false) > 0:
+
+                data_true = np.array(values_true)
+                data_false = np.array(values_false)
+
+                (n, bins, patches) = axs[ix].hist(data_true, bins,
+                                              facecolor=group_colours[group + '_true'],
+                                              alpha=0.75, label=group)
+
+                #(n, bins, patches) = axs[ix,iy].hist(data_false, bins,
+                #                              facecolor=group_colours[group + '_false'],
+                #                              alpha=0.75, label=group + ' misclassified')
+
+                #axs[ix,iy].set_title('Distribution in $\delta ' + par + '$', fontsize=18)
+                axs[ix].set_xlabel('$\delta ' + par + '$', fontsize=18)
+                axs[ix].set_ylabel('Frequency', fontsize=18)
+
+                axs[ix].set_xlim(limits[0], limits[1])
+
+                axs[ix].grid(True)
+                if ix == 0:
+                    axs[ix].legend(ncol = 3, bbox_to_anchor=(0.5, -2.1, 2.0, 2.0), fontsize=16)
+
+                axs[ix].tick_params(axis='both', which='major', labelsize=18)
+
+        ix += 1
+
+    plt.savefig(path.join(params['log_dir'], 'delta_binary_param_distributions.png'),
+                            bbox_inches='tight')
+
+    plt.close(fig)
+
     return summary
 
 def get_xlimits(data_true,data_false):
