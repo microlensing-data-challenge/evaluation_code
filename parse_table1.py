@@ -281,12 +281,19 @@ def read_standard_ascii_DC_table(file_path,page=False):
             header = items[2:]
             
         elif len(line.replace('\n','')) > 0:
-            
-            modelID = items[0]
-            if len(str(modelID).split('_')) > 2:
-                modelID = '_'.join(str(modelID).split('_')[0:2])
-            
-            entry = EventEntry({'idx': (len(model_data)+1), 
+
+            # ModelID needs to be of the form 'ulwdc1_'+add_lead_zeros(entries[icol],3)
+            modelID = str(items[0])
+            if 'ulwdc1_' in modelID and len(modelID.split('_')) > 2:
+                modelID = '_'.join(modelID.split('_')[0:2])
+            elif 'ulwdc1_' in modelID and len(modelID.split('_')) <= 2:
+                pass
+            else:
+                modelID = modelID.replace('ulwdc', 'ulwdc1_')
+                if len(modelID.split('_')) > 2:
+                    modelID = '_'.join(modelID.split('_')[0:2])
+
+            entry = EventEntry({'idx': (len(model_data)+1),
                                 'modelID': modelID, 
                                 'model_class': items[1]})
     
@@ -354,7 +361,7 @@ def read_standard_ascii_DC_table(file_path,page=False):
             #else:
                 
             #    print('Error parsing line '+str(i)+' in '+path.basename(file_path))
-                
+
     return model_data
 
 def read_master_table(file_path,page=False):
@@ -404,7 +411,7 @@ def read_master_table(file_path,page=False):
             
             e.t0 = float(entries[32]) + 2458234.0
             e.sig_t0 = 0.0
-            e.tE = float(entries[33]) 
+            e.tE = float(entries[33])
             e.sig_tE = 0.0
             e.u0 = float(entries[30])
             e.sig_u0 = 0.0

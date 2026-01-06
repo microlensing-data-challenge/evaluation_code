@@ -188,47 +188,48 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     
     summary.write('</table><br>\n')
 
+    # Plot barchart of classifications per class
     bwidth = 0.4
-    fig, ax = plt.subplots(1,1, figsize=(10,10))
+    tick_label_font = 18
+    axis_label_font = 20
+    title_label_font = 25
+    fig, axs = plt.subplots(1,2, figsize=(20,10))
+    plt.subplots_adjust(wspace=0.3)
 
-    p1 = ax.bar(axticks-bwidth/2.0, good_classes,
+    p1 = axs[0].bar(axticks-bwidth/2.0, good_classes,
                          bwidth, color='r', label='Accurately classified')
 
-    p2 = ax.bar(axticks+bwidth/2.0, bad_classes,
+    p2 = axs[0].bar(axticks+bwidth/2.0, bad_classes,
                          bwidth, color='k', label='Misclassified')
     
-    ax.set_xlabel('Model type', fontsize=18)
-    ax.set_ylabel('Number classified', fontsize=18)
+    axs[0].set_xlabel('Model type', fontsize=axis_label_font)
+    axs[0].set_ylabel('Number classified', fontsize=axis_label_font)
     
-    ax.set_xticks(axticks, axlabels, fontsize=16)
-    ax.tick_params(axis='both', which='major', labelsize=16)
+    axs[0].set_xticks(axticks, axlabels, fontsize=tick_label_font)
+    axs[0].tick_params(axis='both', which='major', labelsize=tick_label_font)
 
-    ax.grid(True)
-    ax.legend(fontsize=16)
-    
-    plt.savefig(path.join(params['log_dir'],'classifications.png'),bbox_inches='tight')
-    
-    plt.close(fig)
+    axs[0].grid(True)
+    axs[0].legend(fontsize=tick_label_font)
 
-    fig = plt.figure(2,(10,10))
-    
-    plt.imshow(confuse_matrix, interpolation='nearest', cmap=plt.cm.Blues)
-    
-    cbar = plt.colorbar()
-    cbar.ax.tick_params(labelsize=16)
-    cbar.set_label('Number of stars', fontsize=16)
+    # Plot confusion matrix
+    image = axs[1].imshow(confuse_matrix, interpolation='nearest', cmap=plt.cm.Blues)
+
+    cbar = fig.colorbar(image, ax=axs[1], orientation='vertical')
+    cbar.ax.tick_params(labelsize=tick_label_font)
+    cbar.set_label('Number of stars', fontsize=tick_label_font)
 
     xtick_marks = np.arange(len(fitted_classes))
-    plt.xticks(xtick_marks, fitted_classes, rotation=45, fontsize=16)
+    axs[1].set_xticks(xtick_marks, fitted_classes, rotation=45, fontsize=tick_label_font)
     ytick_marks = np.arange(len(true_classes))
-    plt.yticks(ytick_marks, true_classes, fontsize=16)
+    axs[1].set_yticks(ytick_marks, true_classes, rotation=45, fontsize=tick_label_font)
 
-    plt.ylabel('True class', fontsize=18)
-    plt.xlabel('Fitted class', fontsize=18)
+    axs[1].set_ylabel('True class', fontsize=axis_label_font)
+    axs[1].set_xlabel('Fitted class', fontsize=axis_label_font)
+
+    plt.suptitle(params['teamID'], fontsize=title_label_font)
+    plt.savefig(path.join(params['log_dir'],'classification_results.png'),bbox_inches='tight')
     
-    plt.savefig(path.join(params['log_dir'],'confusion_matrix.png'),bbox_inches='tight')
-    
-    plt.close(2)
+    plt.close(fig)
     
     summary.write('<table>\n')
     summary.write('<tr><td><img src="classifications.png" width="100%"></td><td><img src="confusion_matrix.png"  width="100%"></td></tr>\n')
@@ -727,8 +728,14 @@ def compare_times(params,entry_data,categories,summary,log):
     ts_binary = np.array(ts_binary)
 
     # Compute basic statistics
-    print('Time taken for PSPL fits: median ' + str(np.median(ts_pspl)) + ' std.dev ' + str(ts_pspl.std()))
-    print('Time taken for binary fits: median ' + str(np.median(ts_binary)) + ' std.dev ' + str(ts_binary.std()))
+    if len(ts_pspl) > 1:
+        print('Time taken for PSPL fits: median ' + str(np.median(ts_pspl)) + ' std.dev ' + str(ts_pspl.std()))
+    else:
+        print('Time taken for PSPL fits: insufficient data')
+    if len(ts_binary) > 1:
+        print('Time taken for binary fits: median ' + str(np.median(ts_binary)) + ' std.dev ' + str(ts_binary.std()))
+    else:
+        print('Time taken for binary fits: insufficient data')
     print('Number of PSPL fits with measured times: ' + str(len(ts_pspl)))
     print('Number of binary fits with measured times: ' + str(len(ts_binary)))
 
