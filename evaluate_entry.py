@@ -197,10 +197,10 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     plt.subplots_adjust(wspace=0.3)
 
     p1 = axs[0].bar(axticks-bwidth/2.0, good_classes,
-                         bwidth, color='r', label='Accurately classified')
+                         bwidth, color='#050185', label='Accurately classified')
 
     p2 = axs[0].bar(axticks+bwidth/2.0, bad_classes,
-                         bwidth, color='k', label='Misclassified')
+                         bwidth, color='#D48613', label='Misclassified')
     
     axs[0].set_xlabel('Model type', fontsize=axis_label_font)
     axs[0].set_ylabel('Number classified', fontsize=axis_label_font)
@@ -386,7 +386,7 @@ def compare_parameters(params, master_data, entry_data, categories,
             
             if true_class in [ 'PSPL', 'Binary_star', 'Binary_planet']:
                 
-                line = str(modelID).replace('_','\_') + ' & - & - & - & - & - & - & - \\\\\n'
+                line = str(modelID).replace('_','\\_') + ' & - & - & - & - & - & - & - \\\\\n'
 
                 fpars.write(line)
                 
@@ -540,8 +540,8 @@ def plot_deltas(params,deltas,summary, log):
                                                   facecolor='#7F0299', 
                                                   alpha=0.75,label='Missclassified')
                 
-                plt.title('Distribution in $\delta '+par+'$', fontsize=18)
-                plt.xlabel('$\delta '+par+'$', fontsize=18)
+                plt.title('Distribution in $\\delta '+par+'$', fontsize=18)
+                plt.xlabel('$\\delta '+par+'$', fontsize=18)
                 plt.ylabel('Frequency', fontsize=18)
                 
                 (xmin,xmax,ymin,ymax) = plt.axis()
@@ -618,7 +618,7 @@ def plot_deltas(params,deltas,summary, log):
                 #                              alpha=0.75, label=group + ' misclassified')
 
                 #axs[ix,iy].set_title('Distribution in $\delta ' + par + '$', fontsize=18)
-                axs[ix,iy].set_xlabel('$\delta ' + par + '$', fontsize=18)
+                axs[ix,iy].set_xlabel('$\\delta ' + par + '$', fontsize=18)
                 axs[ix,iy].set_ylabel('Frequency', fontsize=18)
 
                 axs[ix,iy].set_xlim(limits[0], limits[1])
@@ -670,7 +670,7 @@ def plot_deltas(params,deltas,summary, log):
                 #                              alpha=0.75, label=group + ' misclassified')
 
                 #axs[ix,iy].set_title('Distribution in $\delta ' + par + '$', fontsize=18)
-                axs[ix].set_xlabel('$\delta ' + par + '$', fontsize=18)
+                axs[ix].set_xlabel('$\\delta ' + par + '$', fontsize=18)
                 axs[ix].set_ylabel('Frequency', fontsize=18)
 
                 axs[ix].set_xlim(limits[0], limits[1])
