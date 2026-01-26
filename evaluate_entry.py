@@ -32,7 +32,7 @@ def evaluate_entry():
     
     master_data = parse_table1.read_master_table(params['master_file'])
     
-    entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'])
+    entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'], time_unit=params['time_unit'])
     
     summary = check_classifications(params, master_data, entry_data, 
                                     categories, summary, log)
@@ -110,12 +110,13 @@ def get_args():
         params['master_file'] = input('Please enter the path to the master parameter file: ')
         params['entry_file'] = input('Please enter the path to the entry data file: ')
         params['teamID'] = input('Please enter the path to the entry data file: ')
-        
+        params['time_unit'] = input('Please enter the unit for timestamps [default: hrs]')
     else:
         
         params['master_file'] = argv[1]
         params['entry_file'] = argv[2]
         params['teamID'] = argv[3]
+        params['time_unit'] = argv[4]
     
     params['log_dir'] = path.dirname(params['entry_file'])
     params['log_file'] = path.join(params['log_dir'], 'evaluation.log')
@@ -190,11 +191,11 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
 
     # Plot barchart of classifications per class
     bwidth = 0.4
-    tick_label_font = 18
-    axis_label_font = 20
-    title_label_font = 25
+    tick_label_font = 22
+    axis_label_font = 24
+    title_label_font = 35
     fig, axs = plt.subplots(1,2, figsize=(20,10))
-    plt.subplots_adjust(wspace=0.3)
+    plt.subplots_adjust(wspace=0.35)
 
     p1 = axs[0].bar(axticks-bwidth/2.0, good_classes,
                          bwidth, color='#050185', label='Accurately classified')
@@ -205,7 +206,7 @@ def check_classifications(params, master_data, entry_data, categories, summary, 
     axs[0].set_xlabel('Model type', fontsize=axis_label_font)
     axs[0].set_ylabel('Number classified', fontsize=axis_label_font)
     
-    axs[0].set_xticks(axticks, axlabels, fontsize=tick_label_font)
+    axs[0].set_xticks(axticks, axlabels, fontsize=tick_label_font, rotation=20)
     axs[0].tick_params(axis='both', which='major', labelsize=tick_label_font)
 
     axs[0].grid(True)
@@ -469,9 +470,9 @@ def plot_deltas(params,deltas,summary, log):
                 'alpha': [-5.0, 5.0, 100],
                 }
 
-    group_colours = {'PSPL_true': '#05C709', 'PSPL_false': '#026604',
-                     'Binary_star_true': '#5D5FFD', 'Binary_star_false': '#020499',
-                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'}
+    group_colours = {'PSPL_true': '#D67302', 'PSPL_false': '#9C5302', #red/orange
+                     'Binary_star_true': '#099C02', 'Binary_star_false': '#055C01', # blue
+                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'} # purple
                      
     log.info('Plotting distributions between fitted and true parameters')
     log.info('\n Parameter mean_diff, median_diff, St.Dev min  max N_models')

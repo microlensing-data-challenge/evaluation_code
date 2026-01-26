@@ -209,7 +209,7 @@ class EventEntry():
         output = ' '.join([str(getattr(self, par[0])) for par in self.requirements])
         return output
 
-def read_standard_ascii_DC_table(file_path,page=False):
+def read_standard_ascii_DC_table(file_path, page=False, time_unit='hrs'):
     """Function to read a Data Challenge entry table in standard ASCII format
     
     Expected format:
@@ -320,7 +320,12 @@ def read_standard_ascii_DC_table(file_path,page=False):
                         
                         values.append(str(f))
                         setattr(entry,header[j],f)
-            
+
+            if time_unit != 'hrs' and time_unit == 'mins':
+                entry.t_fit /= 60.0
+            elif time_unit != 'hrs' and time_unit != 'mins':
+                raise IOError('Unrecognised unit of time entered')
+
             if page:
                 print(entry.summary())
                 cont = input('Continue? ')
