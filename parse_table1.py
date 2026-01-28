@@ -328,6 +328,10 @@ def read_standard_ascii_DC_table(file_path, page=False, time_unit='hrs', angle_u
 
             if angle_unit != 'deg' and entry.alpha:
                 entry.alpha *= 180.0 / np.pi
+                if entry.alpha > 360.0:
+                    entry.alpha -= 360.0
+            if angle_unit != 'deg' and entry.sig_alpha:
+                entry.sig_alpha *= 180 / np.pi
             if float(alpha_min) != 0.0 and entry.alpha:
                 entry.alpha -= float(alpha_min)
 

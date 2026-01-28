@@ -92,40 +92,46 @@ def plot_twoparameter_distributions(args, team_results, master_data, xpar, ypar,
 
     ncol = 2
     nrow = 2
-    fig, axs = plt.subplots(nrow, ncol, figsize=(10,10))
+    fig, axs = plt.subplots(nrow, ncol, figsize=(12,10), layout='constrained')
 
     irow = 0
     icol = 0
     for teamID in range(1, 5, 1):
+        handles = []
+        labels = []
 
         # Plot the true distribution in the background for comparison
         par1 = [getattr(event, xpar) for eventID, event in master_data.items()]
         par2 = [getattr(event, ypar) for eventID, event in master_data.items()]
-        axs[irow,icol].plot(
+        obj, = axs[irow,icol].plot(
             par1, par2,
             marker='o',
             mfc='grey', mec='grey',
             ls='none',
-            alpha=0.3,
-            label=str('Simulation')
+            alpha=0.3
         )
+        if 'Simulation' not in labels:
+            handles.append(obj)
+            labels.append('Simulation')
 
         # Overplot the parameters for the events missed by each team
         par1 = [getattr(master_data[eventID], xpar) for eventID in team_results[teamID]]
         par2 = [getattr(master_data[eventID], ypar) for eventID in team_results[teamID]]
         colors = [plot_colors_class[master_data[eventID].model_class] for eventID in team_results[teamID]]
         symbols = [plot_symbols_class[master_data[eventID].model_class] for eventID in team_results[teamID]]
+        models = [master_data[eventID].model_class for eventID in team_results[teamID]]
 
         for j in range(0,len(par1),1):
             if par1[j] and par2[j]:
-                axs[irow,icol].plot(
+                obj, = axs[irow,icol].plot(
                     par1[j], par2[j],
                     marker=symbols[j],
                     mfc=colors[j], mec=colors[j],
                     ls='none',
-                    alpha=1.0,
-                    label=str('Team ' + str(teamID))
-                )
+                    alpha=1.0)
+                if models[j] not in labels:
+                    handles.append(obj)
+                    labels.append(models[j])
 
         axs[irow,icol].set_xlabel(xlabel, fontsize=18)
         axs[irow,icol].set_ylabel(ylabel, fontsize=18)
@@ -133,13 +139,22 @@ def plot_twoparameter_distributions(args, team_results, master_data, xpar, ypar,
         axs[irow,icol].tick_params(axis='y', labelsize=16)
 
         axs[irow,icol].set_title('Team ' + str(teamID), fontsize=18)
-        #axs[irow,icol].legend(fontsize=18)
         axs[irow,icol].grid()
 
         icol += 1
         if icol == ncol:
             icol = 0
             irow +=1
+
+    axs[1, 1].legend(
+        handles=handles,
+        labels=labels,
+        ncol=2,
+        bbox_to_anchor=(1.05, -0.2),
+        fontsize=16
+    )
+
+    plt.subplots_adjust(left=0.02, bottom=0.01, right=0.95, top=0.95, wspace=0.3, hspace=0.3)
 
     plt.tight_layout()
     plt.savefig(path.join(args.data_dir, xpar + ypar + '_distribution.png'))

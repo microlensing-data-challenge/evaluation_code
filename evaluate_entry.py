@@ -379,9 +379,6 @@ def compare_parameters(params, master_data, entry_data, categories,
 
                         (dpar,within_1sig,within_3sig,mean_sq_err) = compare_parameter(par_true,par_fit,par_error)
 
-                        #if par == 't0':   
-                         #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
-                        
                         if colour_coding:
                             if within_1sig and within_3sig:
                                 line = line + ' <td> ' + str(par_fit)+' &plusmn; '+str(par_error) + \
@@ -780,7 +777,8 @@ def plot_fitted_values(params, fitted_values, log):
     ix = 0
     iy = 0
     for par in ['t0', 'tE', 'u0', 'rho', 'piE', 'fb_W']:
-        limits = plot_limits[par]
+        min_val = 1e8
+        max_val = -1e8
 
         for group in group_list:
 
@@ -799,29 +797,28 @@ def plot_fitted_values(params, fitted_values, log):
                     label=group
                 )
 
-                if par != 'fb_W':
-                    axs[ix, iy].set_xlabel('True ' + par + ' ' + units[par], fontsize=18)
-                    axs[ix, iy].set_ylabel('Fitted ' + par + ' ' + units[par], fontsize=18)
-                else:
-                    axs[ix, iy].set_xlabel('True log(' + par + ') ' + units[par], fontsize=18)
-                    axs[ix, iy].set_ylabel('Fitted log(' + par + ') ' + units[par], fontsize=18)
-
-                min_val = min(data[:,0].min(), data[:,1].min())
-                max_val = max(data[:,0].max(), data[:,1].max())
-                axs[ix, iy].set_xlim(min_val, max_val)
-                axs[ix, iy].set_ylim(min_val, max_val)
-                #axs[ix, iy].set_xlim(limits[0], limits[1])
-                #axs[ix, iy].set_ylim(limits[0], limits[1])
-                if par == 'fb_W':
-                    axs[ix, iy].set_xscale('log')
-                    axs[ix, iy].set_yscale('log')
-
-                axs[ix, iy].tick_params(axis='both', which='major', labelsize=18)
-
-                axs[ix, iy].grid(True)
+                min_val = min(min_val, (min(data[:,0].min(), data[:,1].min())))
+                max_val = max(max_val, (max(data[:,0].max(), data[:,1].max())))
 
             if ix == 0 and iy == 0:
                 axs[ix, iy].legend(ncol=3, bbox_to_anchor=(0.5, 0.3, 1.0, 1.0), fontsize=16)
+
+        axs[ix, iy].set_xlim(min_val, max_val)
+        axs[ix, iy].set_ylim(min_val, max_val)
+
+        if par == 'fb_W':
+            axs[ix, iy].set_xscale('log')
+            axs[ix, iy].set_yscale('log')
+
+        if par != 'fb_W':
+            axs[ix, iy].set_xlabel('True ' + par + ' ' + units[par], fontsize=18)
+            axs[ix, iy].set_ylabel('Fitted ' + par + ' ' + units[par], fontsize=18)
+        else:
+            axs[ix, iy].set_xlabel('True log(' + par + ') ' + units[par], fontsize=18)
+            axs[ix, iy].set_ylabel('Fitted log(' + par + ') ' + units[par], fontsize=18)
+
+        axs[ix, iy].tick_params(axis='both', which='major', labelsize=18)
+        axs[ix, iy].grid(True)
 
         ix += 1
         if ix == nrow:
@@ -841,7 +838,8 @@ def plot_fitted_values(params, fitted_values, log):
 
     ix = 0
     for par in ['s', 'q', 'alpha']:
-        limits = plot_limits[par]
+        min_val = 1e8
+        max_val = -1e8
 
         for group in group_list:
 
@@ -858,19 +856,19 @@ def plot_fitted_values(params, fitted_values, log):
                     label=group
                 )
 
-                axs[ix].set_xlabel('True ' + par + ' value ' + units[par], fontsize=18)
-                axs[ix].set_ylabel('Fitted ' + par + ' value ' + units[par], fontsize=18)
-
-                min_val = min(data[:,0].min(), data[:,1].min())
-                max_val = max(data[:,0].max(), data[:,1].max())
-                axs[ix].set_xlim(min_val, max_val)
-                axs[ix].set_ylim(min_val, max_val)
-
-                axs[ix].grid(True)
-                axs[ix].tick_params(axis='both', which='major', labelsize=18)
+                min_val = min(min_val, (min(data[:, 0].min(), data[:, 1].min())))
+                max_val = max(max_val, (max(data[:, 0].max(), data[:, 1].max())))
 
             if ix == 0:
                 axs[ix].legend(ncol=3, bbox_to_anchor=(0.2, 0.21, 2.0, 1.0), fontsize=16)
+
+            axs[ix].set_xlim(min_val, max_val)
+            axs[ix].set_ylim(min_val, max_val)
+            axs[ix].set_xlabel('True ' + par + ' value ' + units[par], fontsize=18)
+            axs[ix].set_ylabel('Fitted ' + par + ' value ' + units[par], fontsize=18)
+            axs[ix].grid(True)
+            axs[ix].tick_params(axis='both', which='major', labelsize=18)
+
         ix += 1
 
     plt.savefig(path.join(params['log_dir'], 'binary_param_comparisons.png'),
@@ -1018,6 +1016,8 @@ def extract_parameter_entries(dataset, group, par, ndp):
         stddev = str(round(dataset[group+'_true'][par].std(), ndp))
         sqerr = str(round(np.median(dataset[group+'_true'][par+'_mean_sq_err']), ndp))
         #sqerr = str(round(dataset[group + '_true'][par + '_mean_sq_err'].mean(), ndp))
+        if 'nan' in sqerr:
+            sqerr = ' - '
         nval = str(len(dataset[group+'_true'][par]))
 
     else:
@@ -1062,7 +1062,7 @@ def export_parameter_table(params, fitted_values, deltas, log):
         f.write("\\begin{tabular}{ | l | c | c | c | c | c | c | c | c | c | c |}\n")
         f.write("\hline\n")
         f.write("$\\Delta$ parameter & $t_{0}$ & $u_{0}$ & $t_{\\rm{E}}$ & $\\rho$ & $\pi_{\\rm{E}}$ & $s$ & $q$ & $\\alpha$ & $f_{s, W}$ & $f_{b, W}$ \\\\ \n")
-        f.write("& [days] & & [days] & & & & & [rads] & counts & counts \\\\ \n")
+        f.write("& [days] & & [days] & & & & & [deg] & counts & counts \\\\ \n")
         f.write("\hline \n")
 
         # PSPL data
