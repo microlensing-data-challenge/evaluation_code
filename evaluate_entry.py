@@ -28,22 +28,31 @@ def evaluate_entry():
     
     summary_path = path.join(params['log_dir'],'entry_summary.html')
     
-    summary = start_html_file(summary_path,title=params['teamID'])
+    summary = start_html_file(summary_path, title=params['teamID'])
     
     master_data = parse_table1.read_master_table(params['master_file'])
     
-    entry_data = parse_table1.read_standard_ascii_DC_table(params['entry_file'], time_unit=params['time_unit'])
+    entry_data = parse_table1.read_standard_ascii_DC_table(
+        params['entry_file'],
+        time_unit=params['time_unit'],
+        angle_unit=params['angle_unit'],
+        alpha_min=params['alpha_min']
+    )
     
     summary = check_classifications(params, master_data, entry_data, 
                                     categories, summary, log)
     
-    (deltas,summary) = compare_parameters(params, master_data, entry_data, 
+    (deltas, fitted_values, summary) = compare_parameters(params, master_data, entry_data,
                                     categories, summary, log)
     
     summary = plot_deltas(params,deltas,summary, log)
-    
+
+    plot_fitted_values(params, fitted_values, log)
+
     summary = compare_times(params,entry_data,categories,summary,log)
-    
+
+    export_parameter_table(params, fitted_values, deltas, log)
+
     log.info( 'Analysis complete\n' )
     logging.shutdown()
     
@@ -111,12 +120,16 @@ def get_args():
         params['entry_file'] = input('Please enter the path to the entry data file: ')
         params['teamID'] = input('Please enter the path to the entry data file: ')
         params['time_unit'] = input('Please enter the unit for timestamps [default: hrs]')
+        params['angle_unit'] = input('Please enter the unit for alpha [default: deg]')
+        params['alpha_min'] = input('Please enter the unit for alpha [default: deg]')
     else:
         
         params['master_file'] = argv[1]
         params['entry_file'] = argv[2]
         params['teamID'] = argv[3]
         params['time_unit'] = argv[4]
+        params['angle_unit'] = argv[5]
+        params['alpha_min'] = argv[6]
     
     params['log_dir'] = path.dirname(params['entry_file'])
     params['log_file'] = path.join(params['log_dir'], 'evaluation.log')
@@ -313,17 +326,24 @@ def compare_parameters(params, master_data, entry_data, categories,
     
     fpars = start_html_table(fpars,hdrs)
 
-    priority_pars = ['t0', 'tE', 'u0', 'piE', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
+    priority_pars = ['t0', 'tE', 'u0', 'piE', 'rho', 'fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     
     deltas = { 'PSPL_true': {}, 'PSPL_false': {},
                'Binary_star_true': {}, 'Binary_star_false': {},
                'Binary_planet_true': {}, 'Binary_planet_false': {},
               }
+    fitted_values = {
+        'PSPL_true': {}, 'PSPL_false': {},
+        'Binary_star_true': {}, 'Binary_star_false': {},
+        'Binary_planet_true': {}, 'Binary_planet_false': {},
+    }
+
     for group in deltas.keys():
         for key in priority_pars:
             deltas[group][key] = []
             deltas[group][key+'_mean_sq_err'] = []
-    
+            fitted_values[group][key] = []
+
     log.info('Comparing parameter fitted values with those simulated')
     
     for modelID, model in master_data.items():
@@ -353,9 +373,12 @@ def compare_parameters(params, master_data, entry_data, categories,
                         par_true = getattr(model,par)
                         par_fit = getattr(m,par)
                         par_error = getattr(m,'sig_'+par)
-                        
+
+                        if par in priority_pars and par_fit:
+                            fitted_values[group][par].append([par_true, par_fit, par_error])
+
                         (dpar,within_1sig,within_3sig,mean_sq_err) = compare_parameter(par_true,par_fit,par_error)
-                        
+
                         #if par == 't0':   
                          #   print(modelID, model.model_class, par,par_true,par_fit,dpar,par_error,within_1sig,within_3sig)
                         
@@ -390,7 +413,15 @@ def compare_parameters(params, master_data, entry_data, categories,
                 line = str(modelID).replace('_','\\_') + ' & - & - & - & - & - & - & - \\\\\n'
 
                 fpars.write(line)
-                
+
+
+    for group, data_dict in fitted_values.items():
+        for key, data in data_dict.items():
+            fitted_values[group][key] = np.array(data)
+    for group, data_dict in deltas.items():
+        for key, data in data_dict.items():
+            deltas[group][key] = np.array(data)
+
     fpars.write('</table>\n')
     fpars.write('</body>\n')
     fpars.write('</html>\n')
@@ -399,7 +430,7 @@ def compare_parameters(params, master_data, entry_data, categories,
     summary.write('<br><h2>Comparison of parameters with simulated values</h2>\n')
     summary.write('<p><a href="parameters_evaluation.html">Cross-matched parameter table</a></p>\n')
     
-    return deltas, summary
+    return deltas, fitted_values, summary
 
 def get_model_group(true_class,accurate_class):
     
@@ -449,31 +480,38 @@ def compare_parameter(true_par,fitted_par,fitted_error):
         
     return delta_par, within_1sig, within_3sig, mean_sq_err
 
+def delta_plot_config():
+    plot_limits = {'t0': [-20.0, 20.0, 100],
+                   'tE': [-20.0, 20.0, 100],
+                   'u0': [-2.0, 2.0, 100],
+                   'rho': [0.0, 2.0, 100],
+                   'piE': [-5.0, 5.0, 100],
+                   'fs_W': [-1e4, 1e4, 200],
+                   'fb_W': [-1e4, 1e4, 200],
+                   'fs_Z': [-1e4, 1e4, 200],
+                   'fb_Z': [-1e4, 1e4, 200],
+                   's': [-5.0, 5.0, 100],
+                   'q': [-5.0, 5.0, 100],
+                   'alpha': [0.0, 360.0, 10],
+                   }
+
+    group_colours = {'PSPL_true': '#D67302', 'PSPL_false': '#9C5302',  # red/orange
+                     'Binary_star_true': '#099C02', 'Binary_star_false': '#055C01',  # blue
+                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'}  # purple
+
+    return plot_limits, group_colours
+
+
 def plot_deltas(params,deltas,summary, log):
     """Function to plot distributions of the differences between the fitted 
     and true parameters"""
 
-    priority_pars = ['t0', 'tE', 'u0', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
+    priority_pars = ['t0', 'tE', 'u0', 'rho', 'piE','fs_W', 'fb_W', 'fs_Z', 'fb_Z', 's', 'q', 'alpha']
     headers = ['Parameter', 'Mean diff', 'Median diff', 'St. Dev', 'Min diff', 'Max diff', 'N models fitted', 'Avg mean sq error']
     
     # xmin, xmax, nbins
-    plot_limits = {'t0': [-20.0, 20.0, 100],
-                'tE': [-20.0, 20.0, 100],
-                'u0': [-2.0, 2.0, 100],
-                'piE': [-5.0, 5.0, 100],
-                'fs_W': [-1e4, 1e4, 200],
-                'fb_W': [-1e4, 1e4, 200],
-                'fs_Z': [-1e4, 1e4, 200],
-                'fb_Z': [-1e4, 1e4, 200],
-                's': [-5.0, 5.0, 100],
-                'q': [-5.0, 5.0, 100],
-                'alpha': [-5.0, 5.0, 100],
-                }
+    plot_limits, group_colours = delta_plot_config()
 
-    group_colours = {'PSPL_true': '#D67302', 'PSPL_false': '#9C5302', #red/orange
-                     'Binary_star_true': '#099C02', 'Binary_star_false': '#055C01', # blue
-                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'} # purple
-                     
     log.info('Plotting distributions between fitted and true parameters')
     log.info('\n Parameter mean_diff, median_diff, St.Dev min  max N_models')
     
@@ -490,13 +528,13 @@ def plot_deltas(params,deltas,summary, log):
             
             values = deltas[group][par]
             mean_sq_values = deltas[group][par+'_mean_sq_err']
-            
+
             if len(values) > 0:
                 data = np.array(values)
                 mean_sq_data = np.array(mean_sq_values)
             
                 median = np.median(data)
-                
+
                 if len(mean_sq_values) > 0:
                     log.info(par+' '+str(data.mean())+' '+str(median)+' '+str(data.std())+' '+str(data.min())+' '+str(data.max())+' '+str(len(data))+' '+repr(mean_sq_data.mean()))
                     summary.write('<tr><td>'+par+'</td><td>'+str(data.mean())+'</td><td>'+str(median)+'</td><td>'+str(data.std())+'</td><td>'+str(data.min())+'</td><td>'+str(data.max())+'</td><td>'+str(len(data))+'</td><td>'+str(mean_sq_data.mean())+'</td></tr>\n')
@@ -588,14 +626,14 @@ def plot_deltas(params,deltas,summary, log):
 
     # Re-adding summary plots for paper
     # PSPL parameters for all event types
-    ncol = 2
+    ncol = 3
     nrow = 2
     fig, axs = plt.subplots(nrow, ncol, figsize=(10, 10))
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.3, hspace=0.3)
 
     ix = 0
     iy = 0
-    for par in ['t0', 'tE', 'u0', 'piE']:
+    for par in ['t0', 'tE', 'u0', 'rho', 'piE']:
         limits = plot_limits[par]
 
         bins = np.arange(limits[0], limits[1], (limits[1]-limits[0])/limits[2])
@@ -631,7 +669,7 @@ def plot_deltas(params,deltas,summary, log):
                 axs[ix,iy].tick_params(axis='both', which='major', labelsize=18)
 
         ix += 1
-        if ix == ncol:
+        if ix == nrow:
             ix = 0
             iy += 1
 
@@ -690,6 +728,156 @@ def plot_deltas(params,deltas,summary, log):
     plt.close(fig)
 
     return summary
+
+def plot_config():
+    # Based on ranges of true values
+    plot_limits = {'t0': [7000.0, 11000.0, 100],
+                   'tE': [0.0, 200.0, 10],
+                   'u0': [-2.5, 2.5, 100],
+                   'rho': [0.0, 2.0, 100],
+                   'piE': [0.0, 60.0, 100],
+                   'fs_W': [0.0, 1e6, 200],
+                   'fb_W': [0.0, 1e6, 200],
+                   'fs_Z': [0.0, 1e6, 200],
+                   'fb_Z': [0.0, 1e6, 200],
+                   's': [0.0, 20.0, 100], # Not logged
+                   'q': [0.0, 1.0, 100], # Not logged
+                   'alpha': [0.0, 360.0, 10],
+                   }
+
+    group_colours = {'PSPL_true': '#D67302', 'PSPL_false': '#9C5302',  # red/orange
+                     'Binary_star_true': '#099C02', 'Binary_star_false': '#055C01',  # blue
+                     'Binary_planet_true': '#CC03F5', 'Binary_planet_false': '#7F0299'}  # purple
+
+    return plot_limits, group_colours
+
+def plot_fitted_values(params, fitted_values, log):
+
+    plot_limits, group_colours = plot_config()
+    units = {
+        't0': '[days]',
+        'u0': '',
+        'tE': '[days]',
+        'piE': '',
+        'rho': '',
+        'fs_W': '[counts]',
+        'fb_W': '[counts]',
+        'fs_Z': '[counts]',
+        'fb_Z': '[counts]',
+        's': '',
+        'q': '',
+        'alpha': '[deg]'
+    }
+
+    # Re-adding summary plots for paper
+    # PSPL parameters for all event types
+    ncol = 2
+    nrow = 3
+    group_list = ['PSPL', 'Binary_star', 'Binary_planet']
+    fig, axs = plt.subplots(nrow, ncol, figsize=(20, 10))
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.25, hspace=0.4)
+
+    ix = 0
+    iy = 0
+    for par in ['t0', 'tE', 'u0', 'rho', 'piE', 'fb_W']:
+        limits = plot_limits[par]
+
+        for group in group_list:
+
+            data = fitted_values[group + '_true'][par]
+
+            if len(data) > 0:
+                if 't0' in par:
+                    data[:,0] -= 2450000.0
+                    data[:,1] -= 2450000.0
+
+                axs[ix,iy].plot(
+                    data[:,0], data[:,1],
+                    c=group_colours[group + '_true'],
+                    marker='.',
+                    ls='none',
+                    label=group
+                )
+
+                if par != 'fb_W':
+                    axs[ix, iy].set_xlabel('True ' + par + ' ' + units[par], fontsize=18)
+                    axs[ix, iy].set_ylabel('Fitted ' + par + ' ' + units[par], fontsize=18)
+                else:
+                    axs[ix, iy].set_xlabel('True log(' + par + ') ' + units[par], fontsize=18)
+                    axs[ix, iy].set_ylabel('Fitted log(' + par + ') ' + units[par], fontsize=18)
+
+                min_val = min(data[:,0].min(), data[:,1].min())
+                max_val = max(data[:,0].max(), data[:,1].max())
+                axs[ix, iy].set_xlim(min_val, max_val)
+                axs[ix, iy].set_ylim(min_val, max_val)
+                #axs[ix, iy].set_xlim(limits[0], limits[1])
+                #axs[ix, iy].set_ylim(limits[0], limits[1])
+                if par == 'fb_W':
+                    axs[ix, iy].set_xscale('log')
+                    axs[ix, iy].set_yscale('log')
+
+                axs[ix, iy].tick_params(axis='both', which='major', labelsize=18)
+
+                axs[ix, iy].grid(True)
+
+            if ix == 0 and iy == 0:
+                axs[ix, iy].legend(ncol=3, bbox_to_anchor=(0.5, 0.3, 1.0, 1.0), fontsize=16)
+
+        ix += 1
+        if ix == nrow:
+            ix = 0
+            iy += 1
+
+    plt.savefig(path.join(params['log_dir'], 'pspl_param_comparisons.png'),
+                            bbox_inches='tight')
+
+    plt.close(fig)
+
+    # Binary lens parameters for all event types
+    ncol = 3
+    nrow = 1
+    fig, axs = plt.subplots(nrow, ncol, figsize=(20, 6))
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.3, hspace=0.3)
+
+    ix = 0
+    for par in ['s', 'q', 'alpha']:
+        limits = plot_limits[par]
+
+        for group in group_list:
+
+            data = fitted_values[group + '_true'][par]
+            if par in ['s','q','alpha'] and len(data)> 0:
+                print(par, data[:,0].min(), data[:,0].max(), data[:,1].min(), data[:,1].max())
+
+            if len(data) > 0:
+                axs[ix].plot(
+                    data[:, 0], data[:, 1],
+                    c=group_colours[group + '_true'],
+                    marker='.',
+                    ls='none',
+                    label=group
+                )
+
+                axs[ix].set_xlabel('True ' + par + ' value ' + units[par], fontsize=18)
+                axs[ix].set_ylabel('Fitted ' + par + ' value ' + units[par], fontsize=18)
+
+                min_val = min(data[:,0].min(), data[:,1].min())
+                max_val = max(data[:,0].max(), data[:,1].max())
+                axs[ix].set_xlim(min_val, max_val)
+                axs[ix].set_ylim(min_val, max_val)
+
+                axs[ix].grid(True)
+                axs[ix].tick_params(axis='both', which='major', labelsize=18)
+
+            if ix == 0:
+                axs[ix].legend(ncol=3, bbox_to_anchor=(0.2, 0.21, 2.0, 1.0), fontsize=16)
+        ix += 1
+
+    plt.savefig(path.join(params['log_dir'], 'binary_param_comparisons.png'),
+                            bbox_inches='tight')
+
+    plt.close(fig)
+
 
 def get_xlimits(data_true,data_false):
     
@@ -819,7 +1007,131 @@ def start_html_file(file_path,title=None):
         f.write('<center><h1>'+title+'</h1></center>\n')
    
     return f
-   
+
+def extract_parameter_entries(dataset, group, par, ndp):
+
+    if len(dataset[group+'_true'][par]) > 0:
+        if abs(np.median(dataset[group+'_true'][par])) >= 1/(10**ndp):
+            median_value = str(round(np.median(dataset[group+'_true'][par]), ndp))
+        else:
+            median_value = f"{np.median(dataset[group+'_true'][par]):.2e}"
+        stddev = str(round(dataset[group+'_true'][par].std(), ndp))
+        sqerr = str(round(np.median(dataset[group+'_true'][par+'_mean_sq_err']), ndp))
+        #sqerr = str(round(dataset[group + '_true'][par + '_mean_sq_err'].mean(), ndp))
+        nval = str(len(dataset[group+'_true'][par]))
+
+    else:
+        median_value = ' - '
+        stddev = ' - '
+        sqerr = ' - '
+        nval = ' 0 '
+
+    return {'median': median_value, 'stddev': stddev, 'sqerr': sqerr, 'nval': nval}
+
+def build_table_row(first_col, par_list, entries, statistic):
+    row = first_col + " "
+    for par in par_list.keys():
+        row = row + " & " + entries[par][statistic]
+    row = row + "\\\\ \n"
+
+    return row
+
+def export_parameter_table(params, fitted_values, deltas, log):
+
+    file_path = path.join(params['log_dir'], params['teamID'] + '_results.tex')
+
+    # Parameters to include in the table with the number of decimal places
+    par_list = {
+        't0': 4,
+        'u0': 3,
+        'tE': 3,
+        'rho': 3,
+        'piE': 3,
+        's': 3,
+        'q': 3,
+        'alpha': 2,
+        'fs_W': 1,
+#        'fs_Z': 1,
+        'fb_W': 1,
+#        'fb_Z': 1
+    }
+
+    with open(file_path, 'w') as f:
+        # Table header
+        f.write("\\begin{table*}\n")
+        f.write("\\begin{tabular}{ | l | c | c | c | c | c | c | c | c | c | c |}\n")
+        f.write("\hline\n")
+        f.write("$\\Delta$ parameter & $t_{0}$ & $u_{0}$ & $t_{\\rm{E}}$ & $\\rho$ & $\pi_{\\rm{E}}$ & $s$ & $q$ & $\\alpha$ & $f_{s, W}$ & $f_{b, W}$ \\\\ \n")
+        f.write("& [days] & & [days] & & & & & [rads] & counts & counts \\\\ \n")
+        f.write("\hline \n")
+
+        # PSPL data
+        f.write("\\multicolumn{11}{ | l |}{{\\bf  Single-lens events}} \\\\ \n")
+
+        group = 'PSPL'
+
+        entries = {}
+        for par, ndp in par_list.items():
+            entries[par] = extract_parameter_entries(deltas, group, par, ndp)
+
+        row = build_table_row("Median $\\Delta$value", par_list, entries, 'median')
+        f.write(row)
+
+        row = build_table_row("Std.dev.", par_list, entries, 'stddev')
+        f.write(row)
+
+        row = build_table_row("Median MSE", par_list, entries, 'sqerr')
+        f.write(row)
+
+        row = build_table_row("Fit in N models", par_list, entries, 'nval')
+        f.write(row)
+
+        # Binary parameters
+        f.write("\\multicolumn{11}{ | l |}{{\\bf  Binary star events}} \\\\ \n")
+        group = 'Binary_star'
+
+        entries = {}
+        for par, ndp in par_list.items():
+            entries[par] = extract_parameter_entries(deltas, group, par, ndp)
+
+        row = build_table_row("Median $\\Delta$value", par_list, entries, 'median')
+        f.write(row)
+
+        row = build_table_row("Std.dev.", par_list, entries, 'stddev')
+        f.write(row)
+
+        row = build_table_row("Median MSE", par_list, entries, 'sqerr')
+        f.write(row)
+
+        row = build_table_row("Fit in N models", par_list, entries, 'nval')
+        f.write(row)
+
+        # Planetary binaries
+        f.write("\\multicolumn{11}{ | l |}{{\\bf  Binary planet events}} \\\\ \n")
+        group = 'Binary_planet'
+
+        entries = {}
+        for par, ndp in par_list.items():
+            entries[par] = extract_parameter_entries(deltas, group, par, ndp)
+
+        row = build_table_row("Median $\\Delta$value", par_list, entries, 'median')
+        f.write(row)
+
+        row = build_table_row("Std.dev.", par_list, entries, 'stddev')
+        f.write(row)
+
+        row = build_table_row("Median MSE", par_list, entries, 'sqerr')
+        f.write(row)
+
+        row = build_table_row("Fit in N models", par_list, entries, 'nval')
+        f.write(row)
+
+        # Table suffix
+        f.write("\hline\n")
+        f.write("\end{tabular}\n")
+        f.write("\\caption{MSE indicates Mean Square Error}\n")
+        f.write("\\end{table*}\n")
+
 if __name__ == '__main__':
     
     evaluate_entry()
