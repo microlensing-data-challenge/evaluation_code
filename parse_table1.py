@@ -17,6 +17,8 @@ class EventEntry():
     def __init__(self, kwargs=None):
         
         self.idx = None
+        self.ra = None
+        self.dec = None
         self.modelID = None
         self.model_class = None
         self.true_class = None
@@ -328,8 +330,12 @@ def read_standard_ascii_DC_table(file_path, page=False, time_unit='hrs', angle_u
 
             if angle_unit != 'deg' and entry.alpha:
                 entry.alpha *= 180.0 / np.pi
+            if entry.alpha:
                 if entry.alpha > 360.0:
                     entry.alpha -= 360.0
+                elif entry.alpha < 0.0:
+                    entry.alpha = 360.0 + entry.alpha
+
             if angle_unit != 'deg' and entry.sig_alpha:
                 entry.sig_alpha *= 180 / np.pi
             if float(alpha_min) != 0.0 and entry.alpha:
@@ -378,6 +384,26 @@ def read_standard_ascii_DC_table(file_path, page=False, time_unit='hrs', angle_u
 
     return model_data
 
+def magnitude_to_flux(magnitude):
+    """
+    PyLIMA's function for converting flux from magnitude, in order to use a consistent
+    zeropoint for later comparison.
+
+    Parameters
+    ----------
+    magnitude : array, an array of magnitudes
+
+    Returns
+    -------
+    flux : array, the corresponding fluxes
+    """
+    ZERO_POINT = 27.4
+
+    flux = 10 ** ((ZERO_POINT - magnitude) / 2.5)
+
+    return flux
+
+
 def read_master_table(file_path,page=False):
     """Function to read the input file of the original simulation parameters
     per event"""
@@ -417,12 +443,14 @@ def read_master_table(file_path,page=False):
                          'idx': 79,
                          }
             
-            true_fs_W = float(entries[57])
-            true_fl_W = float(entries[63])
+            true_fs_W = magnitude_to_flux(float(entries[57]))
+            true_fl_W = magnitude_to_flux(float(entries[63]))
             
-            true_fs_Z = float(entries[55])
-            true_fl_Z = float(entries[61])
-            
+            true_fs_Z = magnitude_to_flux(float(entries[55]))
+            true_fl_Z = magnitude_to_flux(float(entries[61]))
+
+            e.ra = float(entries[5])
+            e.dec = float(entries[6])
             e.t0 = float(entries[32]) + 2458234.0
             e.sig_t0 = 0.0
             e.tE = float(entries[33])
