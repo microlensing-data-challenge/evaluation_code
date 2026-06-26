@@ -36,12 +36,20 @@ class EventEntry():
         self.sig_piEE = None
         self.piEN = None
         self.sig_piEN = None
+        self.fs_J = None
+        self.sig_fs_J = None
+        self.fs_H = None
+        self.sig_fs_H = None
         self.fs_W = None
         self.sig_fs_W = None
         self.fb_W = None
         self.sig_fb_W = None
-        self.fs_Z = None
-        self.sig_fs_Z = None
+        self.fb_Z = None
+        self.sig_fb_Z = None
+        self.fb_J = None
+        self.sig_fb_J = None
+        self.fb_H = None
+        self.sig_fb_H = None
         self.fb_Z = None
         self.sig_fb_Z = None
         self.s = None
@@ -87,14 +95,22 @@ class EventEntry():
                     ('sig_piEE', 'float', [-5.0,5.0], None),
                     ('piEN', 'float', [-5.0,5.0], None),
                     ('sig_piEN', 'float', [-5.0,5.0], None),
+                    ('fs_J', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs_J', 'float', [0.0,50000.0], 'required'),
+                    ('fs_H', 'float', [-500.0,500000.0], 'required'),
+                    ('sig_fs_H', 'float', [0.0,50000.0], 'required'),
                     ('fs_W', 'float', [-500.0,500000.0], 'required'),
                     ('sig_fs_W', 'float', [0.0,50000.0], 'required'),
-                    ('fb_W', 'float', [-500.0,50000.0], 'required'),
-                    ('sig_fb_W', 'float', [0.0,50000.0], 'required'),
                     ('fs_Z', 'float', [-500.0,500000.0], 'required'),
                     ('sig_fs_Z', 'float', [0.0,50000.0], 'required'),
                     ('fb_Z', 'float', [-500.0,50000.0], 'required'),
                     ('sig_fb_Z', 'float', [0.0,50000.0], 'required'),
+                    ('fb_W', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb_W', 'float', [0.0,50000.0], 'required'),
+                    ('fb_J', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb_J', 'float', [0.0,50000.0], 'required'),
+                    ('fb_H', 'float', [-500.0,50000.0], 'required'),
+                    ('sig_fb_H', 'float', [0.0,50000.0], 'required'),
                     ('s', 'float', [0.0,50.0], 'required'),
                     ('sig_s', 'float', [0.0,50.0], 'required'),
                     ('q', 'float', [0.0,1.0], 'required'),
@@ -442,12 +458,22 @@ def read_master_table(file_path,page=False):
                  pars = { 'model_class': 'CV',
                          'idx': 79,
                          }
-            
-            true_fs_W = magnitude_to_flux(float(entries[57]))
-            true_fl_W = magnitude_to_flux(float(entries[63]))
-            
+
+            # Filters are in order: J, F087, H, W149, W169
+            true_fs_J = magnitude_to_flux(float(entries[54]))
             true_fs_Z = magnitude_to_flux(float(entries[55]))
+            true_fs_H = magnitude_to_flux(float(entries[56]))
+            true_fs_W = magnitude_to_flux(float(entries[57]))
+
+            true_fl_J = magnitude_to_flux(float(entries[60]))
             true_fl_Z = magnitude_to_flux(float(entries[61]))
+            true_fl_H = magnitude_to_flux(float(entries[62]))
+            true_fl_W = magnitude_to_flux(float(entries[63]))
+
+            #true_fl_W = magnitude_to_flux(float(entries[63]))
+            #true_fs_W = magnitude_to_flux(float(entries[57]))
+            #true_fs_Z = magnitude_to_flux(float(entries[55]))
+            #true_fl_Z = magnitude_to_flux(float(entries[61]))
 
             e.ra = float(entries[5])
             e.dec = float(entries[6])
@@ -465,14 +491,27 @@ def read_master_table(file_path,page=False):
             e.sig_piEE = None
             e.piEN = None
             e.sig_piEN = None
-            e.fs_W = float(entries[66])       # -> 67 for second filter
-            e.sig_fs_W = 0.0
-            e.fb_W = calc_fb(true_fs_W, e.fs_W, true_fl_W)
-            e.sig_fb1 = None
-            e.fs_Z = float(entries[67])       # -> 67 for second filter
+            #e.fs_W = float(entries[66])       # -> 67 for second filter
+            e.fs_J = true_fs_J
+            e.sig_fs_J = 0.0
+            #e.fs_Z = float(entries[67])       # -> 67 for second filter
+            e.fs_Z = true_fs_Z
             e.sig_fs_Z = 0.0
-            e.fb_Z = calc_fb(true_fs_Z, e.fs_Z, true_fl_Z)
+            e.fs_H = true_fs_H
+            e.sig_fs_H = 0.0
+            #e.fs_W = float(entries[66])       # -> 67 for second filter
+            e.fs_W = true_fs_W
+            e.sig_fs_W = 0.0
+            #e.fb_W = calc_fb(true_fs_W, e.fs_W, true_fl_W)
+            e.fb_J = true_fl_J
+            e.sig_fb_J = None
+            #e.fb_Z = calc_fb(true_fs_Z, e.fs_Z, true_fl_Z)
+            e.fb_Z = true_fl_Z
             e.sig_fb_Z = None
+            e.fb_H = true_fl_H
+            e.sig_fb_J = 0.0
+            e.fb_W = true_fl_W
+            e.sig_fb_W = 0.0
             e.s = float(entries[47])
             e.sig_s = 0.0
             e.q = float(entries[46])
